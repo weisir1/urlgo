@@ -69,17 +69,11 @@ URLgo.exe -s all -f url.txt
         设置代理,格式: http://username:password@127.0.0.1:8809
 ```
 ## 使用截图
-
-![image-20250106144238900](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106144238900.png)
-
-![image-20250106150739664](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106150739664.png)
-![image-20250106150935678](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106150935678.png)
-
-![image-20250106151139430](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151139430.png)
-
-![image-20250106151439237](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151439237.png)
-
-![image-20250106151533319](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151533319.png)
+![image](https://github.com/user-attachments/assets/84d21387-9552-40af-81aa-304ca1a7781a)
+![image](https://github.com/user-attachments/assets/0eefb8fd-654a-4550-9635-46ebafaa2f5b)
+![image](https://github.com/user-attachments/assets/2c4f2365-95bc-4419-b515-26842dc224ff)
+![image](https://github.com/user-attachments/assets/29443b2e-ce1e-4b6f-bda4-75acf38de7a6)
+![image](https://github.com/user-attachments/assets/f7082ad9-94c7-4d8e-99b8-22961bf1696b)
 
 ## 部分说明
 
@@ -92,7 +86,7 @@ fuzz功能是基于抓到的404目录和路径。将其当作字典,随机组合
 为了更好的兼容和防止漏抓链接,放弃了低误报率,错误的链接会变多但漏抓概率变低,可通过 ‘-s 200’ 筛选状态码过滤无效的链接（但不推荐只看200状态码）
 
 ## 更新说明
-2025/03/01 
+2025/03/03 
 工具首次上传
 
 # 开发由来
