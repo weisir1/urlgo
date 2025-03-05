@@ -1,0 +1,55 @@
+proxy: ""
+timeout: 5
+thread: 50
+urlSteps: 2
+jsSteps: 3
+max: 99999
+headers:
+    Accept: '*/*'
+    Cookie: ""
+    User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.87 Safari/537.36 SE 2.X MetaSr 1.0
+jsFind:
+    - (https{0,1}:[-a-zA-Z0-9（）@:%_\+.~#?&//=]{2,250}?[-a-zA-Z0-9（）@:%_\+.~#?&//=]{3}[.]js)
+    - '["''‘“`]\s{0,6}(/{0,1}[-a-zA-Z0-9（）@:%_\+.~#?&//=]{2,250}[.]js)["''‘“`]'
+urlFind:
+    - '[''"]((?:\/|\.\.\/|\.\/)[^\/\>\< \)\(\{\}\,\''\"\\]([^\>\< \)\(\{\}\,\''\"\\])*?)[''"]'
+    - '[''"]([^\/\>\< \)\(\{\}\,\''\"\\][\w\/]*?\/[\w\/]*?)[''"]'
+    - '["''](\s{0,6}(https{0,1}:[-a-zA-Z0-9()@:%_\+.~#?&//={}]{3,250}?)\s{0,6})["'']'
+infoFiler:
+    Email:
+        - '[''"]([\w!#$%&''*+=?^_`{|}~-]+(?:\.[\w!#$%&''*+=?^_`{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[\w](?:[\w-]*[\w])?)[''"]'
+    IDcard:
+        - '[''"]((\d{8}(0\d|10|11|12)([0-2]\d|30|31)\d{3}$)|(\d{6}(18|19|20)\d{2}(0[1-9]|10|11|12)([0-2]\d|30|31)\d{3}(\d|X|x)))[''"]'
+    Jwt:
+        - '[Bb]earer\s+[a-zA-Z0-9\-=._+/\\]{20,500}|[Bb]asic\s+[A-Za-z0-9+/]{18,}={0,2}|eyJrIjoi[a-zA-Z0-9\-_+/]{30,100}[=]{0,2}'
+        - '["'']?[Aa]uthorization["'']?\s*[:=]\s*[''"]?\b(?:[Tt]oken\s+)?[a-zA-Z0-9\-_+/]{10,500}[''"]?'
+    Other:
+        - '["'']?(admin[_-]?email|app[_-]?id|username|account|account[_-]?(name|key)?|account[_-]?sid|(?i)[\w_-]*?token[\w_-]*?|[\w_-]*?secret[\w_-]*?|private[_-]?key[_-]?|app[_-]?key|[\w_-]*access[_-]?key[\w_-]*|cameraindexcode|user|encryptkey|[bB]ucket|[\w_-]*?api[_-]?key[\w_-]*?)["'']?\s*[:=]\s*["'']?[\p{Han}a-zA-Z0-9/\-\_]{2,}["'']?'
+        - (?i)(?:admin_?pass|password|[a-z]{3,15}_?password|user_?pass|user_?pwd|admin_?pwd|pwd)\\?['"]*\s*[:=]\s*\\?['"][a-z0-9!@#$%&*=]{5,20}\\?['"]
+        - LTAI[A-Za-z\d]{12,30}|AKID[A-Za-z\d]{13,40}|JDC_[0-9A-Z]{25,40}|APID[a-zA-Z0-9]{32,42}|AIza[0-9A-Za-z_\-]{35}|AKLT[a-zA-Z0-9_\-]{16,28}|AKTP[a-zA-Z0-9_\-]{16,28}
+        - '["''](wx[a-z0-9]{15,18})|(ww[a-z0-9]{15,18})|(gh_[a-z0-9]{11,13})["'']'
+    Phone:
+        - '[''"](1(3([0-35-9]\d|4[1-8])|4[14-9]\d|5([\d]\d|7[1-79])|66\d|7[2-35-8]\d|8\d{2}|9[89]\d)\d{7})[''"]'
+risks:
+    - remove
+    - delete
+    - insert
+    - update
+    - logout
+jsFiler:
+    - www\.w3\.org
+    - example\.com
+urlFiler:
+    - \.js\?|\.css\?|\.jpeg\?|\.jpg\?|\.png\?|.gif\?|www\.w3\.org|example\.com|\<|\>|\{|\}|\[|\]|\||\^|;|/js/|\.src|\.replace|\.url|\.att|\.href|location\.href|javascript:|location:|application/x-www-form-urlencoded|application/json|\.createObject|:location|\.path|\*#__PURE__\*|\*\$0\*|\n|text/css|text/javascript|text/xml|text/plain|text/html|image/jpeg|image/png|.*\.js$|.*\.css$|.*\.scss$|.*,$|.*\.jpeg$|.*\.jpg$|.*\.png$|.*\.gif$|.*\.ico$|.*\.svg$|.*\.vue$|.*\.ts$|/text/css$|text/javascript$|(?i)M/D/yy$
+jsFuzzPath:
+    - login.js
+    - app.js
+    - main.js
+    - config.js
+    - admin.js
+    - info.js
+    - open.js
+    - user.js
+    - input.js
+    - list.js
+    - upload.js
