@@ -29,6 +29,7 @@ func load() {
 	if cmd.I {
 		config.GetConfig("config.yaml")
 	}
+	cmd.Parse()
 	if cmd.H {
 		flag.Usage()
 		os.Exit(0)
@@ -43,7 +44,6 @@ func load() {
 		os.Exit(0)
 	}
 	cmd.U = u.String()
-
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Proxy:           http.ProxyFromEnvironment,
@@ -71,7 +71,8 @@ func load() {
 		util.SetProxyConfig(tr)
 	}
 
-	client = &http.Client{Timeout: time.Duration(cmd.TI) * time.Second,
+	client = &http.Client{
+		Timeout:   (time.Duration(cmd.TI) * time.Second),
 		Transport: tr,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
@@ -117,7 +118,9 @@ func min(a, b int) int {
 	return b
 }
 func Run() {
+
 	load()
+
 	if cmd.F != "" {
 		// 创建句柄
 		Initialization()
