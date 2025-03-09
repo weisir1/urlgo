@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"github.com/pingc0y/URLFinder/cmd"
@@ -8,6 +9,7 @@ import (
 	"github.com/pingc0y/URLFinder/result"
 	"github.com/pingc0y/URLFinder/util"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -47,7 +49,7 @@ func Spider(s *result.Scan) {
 				continue
 			}
 
-			request.Header.Set("Accept-Encoding", "gzip") //使用gzip压缩传输数据让访问更快
+			//request.Header.Set("Accept-Encoding", "gzip") //使用gzip压缩传输数据让访问更快
 			request.Header.Set("User-Agent", util.GetUserAgent())
 			request.Header.Set("Accept", "*/*")
 			//增加header选项
@@ -62,56 +64,66 @@ func Spider(s *result.Scan) {
 			if err != nil {
 				return
 			}
-
 			defer response.Body.Close()
 			result := ""
-			//var results strings.Builder
-			//buffer := make([]byte, 1024*10) // 1KB 的缓冲区
-			////解压
+
 			if response.Header.Get("Content-Encoding") == "gzip" {
+
 				reader, err := gzip.NewReader(response.Body) // gzip解压缩
 				if err != nil {
 					return
 				}
 				defer reader.Close()
-				//for {
-				//	n, err := reader.Read(buffer)
-				//	if err != nil && err != io.EOF {
-				//		log.Fatal(err)
-				//	}
-				//	if n == 0 {
-				//		break
-				//	}
-				//	results.Write(buffer[:n])
-				//	// 处理读取到的数据
-				//}
-				if err != nil {
-					return
-				}
-				defer reader.Close()
-				con, err := io.ReadAll(reader)
+				con, err := ioutil.ReadAll(reader)
 				if err != nil {
 					return
 				}
 				result = string(con)
+
 			} else {
+
+				var resultBuffer bytes.Buffer
+
+				//file, err := os.Create("output.txt")
+				//if err != nil {
+				//	fmt.Println("Failed to create file:", err)
+				//	return
+				//}
+				//defer file.Close()
+				//// 使用 io.TeeReader 将内容同时写入缓冲区和文件
+				//teeReader := io.TeeReader(response.Body, &resultBuffer)
+				//_, err = io.Copy(file, teeReader)
+				//if err != nil {
+				//	fmt.Println("Failed to copy response body:", err)
+				//	return
+				//}
+				//
+				//buf := make([]byte, 1024*1024) // 每次读取 1MB
 				//for {
-				//	n, err := response.Body.Read(buffer)
+				//	n, err := response.Body.Read(buf)
 				//	if err != nil && err != io.EOF {
-				//		log.Fatal(err)
+				//		fmt.Println("Failed to read response body:", err)
+				//		return
 				//	}
 				//	if n == 0 {
 				//		break
 				//	}
-				//	results.Write(buffer[:n])
-				//	// 处理读取到的数据
+				//	resultBuffer.Write(buf[:n]) // 将读取的内容写入缓冲区
 				//}
-				dataBytes, err := io.ReadAll(response.Body)
+				_, err := io.Copy(&resultBuffer, response.Body)
 				if err != nil {
 					return
 				}
-				//字节数组 转换成 字符串
-				result = string(dataBytes)
+
+				response.Body.Close()
+				////将缓冲区内容转换为字符串
+				result = resultBuffer.String()
+				//dataBytes, err := ioutil.ReadAll(response.Body)
+				//if err != nil {
+				//	return
+				//}
+				////字节数组 转换成 字符串
+				//result = string(dataBytes)
 				//result = results.String()
 			}
 			base1 := urls[2]
