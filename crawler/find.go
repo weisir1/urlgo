@@ -15,8 +15,8 @@ import (
 func getPrejspath(data string) string {
 	var Prematch []string
 	Preregex := regexp.MustCompile(`"([^"]+)"`)
-	if len(data) > 100 {
-		Prematch = Preregex.FindAllString(data[:100], -1)
+	if len(data) > 50 {
+		Prematch = Preregex.FindAllString(data[:50], -1)
 	}
 	//fmt.Println(Prematch)
 	for _, prematch := range Prematch {
