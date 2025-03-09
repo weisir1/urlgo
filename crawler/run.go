@@ -72,7 +72,7 @@ func load() {
 	}
 
 	client = &http.Client{
-		Timeout:   (time.Duration(cmd.TI) * time.Second),
+		//Timeout:   (time.Duration(cmd.TI) * time.Second),
 		Transport: tr,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
