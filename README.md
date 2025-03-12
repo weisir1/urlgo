@@ -69,17 +69,14 @@ URLgo.exe -s all -f url.txt
         设置代理,格式: http://username:password@127.0.0.1:8809
 ```
 ## 使用截图
+![image-20250106150739664](https://github.com/user-attachments/assets/f6f4f68c-fc5d-49de-b8b2-584a72e48048)
+![image-20250106144238900](https://github.com/user-attachments/assets/5d1f3dfd-3928-4211-899b-24f656dfaa94)
+![image-20250106150739664](https://github.com/user-attachments/assets/23d5038f-3351-4fbe-b368-e4765fd44e4f)
+![image-20250106150935678](https://github.com/user-attachments/assets/b4c3268f-8fcd-434e-abd2-d413034fd9d3)
+![image-20250106151139430](https://github.com/user-attachments/assets/11ae9d96-7dc0-41a4-b0f3-5bc5265eb0cf)
+![image-20250106151439237](https://github.com/user-attachments/assets/81f23ddc-8a43-48c0-932e-427a4ccb7852)
+![image-20250106151533319](https://github.com/user-attachments/assets/c15214dd-598c-4070-b1c1-83cb376a1963)
 
-![image-20250106144238900](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106144238900.png)
-
-![image-20250106150739664](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106150739664.png)
-![image-20250106150935678](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106150935678.png)
-
-![image-20250106151139430](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151139430.png)
-
-![image-20250106151439237](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151439237.png)
-
-![image-20250106151533319](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20250106151533319.png)
 
 ## 部分说明
 
