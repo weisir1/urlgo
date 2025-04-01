@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/pingc0y/URLFinder/cmd"
 	"github.com/pingc0y/URLFinder/crawler"
 	"io"
 	"log"
@@ -13,11 +12,12 @@ func main() {
 	//config.JsSteps = 1
 	//config.UrlSteps = 1
 	//cmd.M = 2
-	//cmd.F = "url1.txt"
+	//cmd.F = "url.txt"
 	//cmd.S = "all"
 	//cmd.T = 300
 	//cmd.X = "http://127.0.0.1:8080"
 	//cmd.M = 2
-	cmd.Parse()
+
+	//cmd.Parse()
 	crawler.Run()
 }
