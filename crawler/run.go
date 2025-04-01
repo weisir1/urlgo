@@ -43,6 +43,7 @@ func load() {
 		fmt.Println("url格式错误,请填写正确url")
 		os.Exit(0)
 	}
+
 	cmd.U = u.String()
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -72,7 +73,7 @@ func load() {
 	}
 
 	client = &http.Client{
-		//Timeout:   (time.Duration(cmd.TI) * time.Second),
+		Timeout:   (time.Duration(cmd.TI) * time.Second),
 		Transport: tr,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
