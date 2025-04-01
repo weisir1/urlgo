@@ -56,7 +56,7 @@ func init() {
 
 func usage() {
 	//[-time timeout]
-	fmt.Fprintf(os.Stderr, `Usage: URLGo [-a user-agent] [-b baseurl] [-c cookie][-f urlFile] [-h help]  [-i configFile]  [-m mode] [-max maximum] [-o outFile]  [-s Status] [-t thread] [-u url] [-x proxy] 
+	fmt.Fprintf(os.Stderr, `Usage:  URLGo [-a user-agent] [-b baseurl] [-c cookie][-f urlFile] [-h help]  [-i configFile]  [-m mode] [-max maximum] [-o outFile]  [-s Status] [-t thread] [-u url] [-x proxy] 
 
 Options:
 `)

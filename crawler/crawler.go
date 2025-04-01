@@ -30,7 +30,7 @@ func Spider(s *result.Scan) {
 			if GetEndUrl(s, u, urls[2]) {
 				continue
 			}
-			fmt.Printf("\rStart  Spider Target %s", u)
+			fmt.Printf("\rStart  Spider Target  %s", u)
 
 			isRisk := -1
 			for _, v := range config.Risks {

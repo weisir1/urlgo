@@ -112,7 +112,7 @@ var (
 func GetConfig(path string) {
 	if f, err := os.Open(path); err != nil {
 		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
-			Conf.Headers = map[string]string{"Cookie": cmd.C, "User-Agent": `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.87 Safari/537.36 SE 2.X MetaSr 1.0`, "Accept": "*/*"}
+			Conf.Headers = map[string]string{"Cookie": cmd.C, "User-Agent": `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)  Chrome/80.0.3987.87 Safari/537.36 SE 2.X MetaSr 1.0`, "Accept": "*/*"}
 			Conf.Proxy = ""
 			Conf.JsFind = JsFind
 			Conf.UrlFind = UrlFind

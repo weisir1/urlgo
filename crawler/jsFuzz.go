@@ -5,7 +5,7 @@ package crawler
 //	paths := []string{}
 //	for i := range result.ResultJs {
 //		re := regexp.MustCompile("(.+/)[^/]+.js").FindAllStringSubmatch(result.ResultJs[i].Url, -1)
-//		if len(re) != 0 {
+//		if len(re) !=  0 {
 //			paths = append(paths, re[0][1])
 //		}
 //		re2 := regexp.MustCompile("(https{0,1}://([a-z0-9\\-]+\\.)*([a-z0-9\\-]+\\.[a-z0-9\\-]+)(:[0-9]+)?/)").FindAllStringSubmatch(result.ResultJs[i].Url, -1)

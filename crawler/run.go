@@ -268,7 +268,7 @@ func AddRedirect(url string) {
 //	}
 //	for i := range result.ResultUrl {
 //		if result.ResultUrl[i].Status == "302" {
-//			result.ResultUrl[i].Url = result.ResultUrl[i].Url + " -> " + result.ResultUrl[i].Redirect
+//			 result.ResultUrl[i].Url = result.ResultUrl[i].Url + " -> " + result.ResultUrl[i].Redirect
 //		}
 //	}
 //

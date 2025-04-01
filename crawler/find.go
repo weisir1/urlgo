@@ -65,7 +65,7 @@ func WebpackJsTiQu(data string) []string {
 	regex := regexp.MustCompile(`(\{[^\}]+\})`)
 	regexJsSuff := regexp.MustCompile(`\+\s*?"(.{0,10}\.js)"`)
 	// FindAllStringSubmatch 返回所有匹配的字符串以及捕获的子组
-	// 处理数字键：将数字键用引号包裹
+	// 处理数字键： 将数字键用引号包裹
 	reNumberKeys := regexp.MustCompile(`(\d+):`)
 	data = reNumberKeys.ReplaceAllString(data, `"$1":`)
 

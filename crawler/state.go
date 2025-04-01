@@ -57,7 +57,7 @@ func JsState(s *result.Scan, u string, i int, sou string, baseurl string) {
 		util.SetHeadersConfig(&request.Header)
 	}
 	//tr := &http.Transport{
-	//	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	//	TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 	//}
 	//client = &http.Client{Timeout: time.Duration(cmd.TI) * time.Second,
 	//	Transport: tr,

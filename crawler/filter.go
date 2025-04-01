@@ -78,7 +78,7 @@ func urlFilter(str [][]string) [][]string {
 		}
 		//对抓到的域名做处理
 		//re := regexp.MustCompile("([a-z0-9\\-]+\\.)+([a-z0-9\\-]+\\.[a-z0-9\\-]+)(:[0-9]+)?").FindAllString(str[i][0], 1)
-		//if len(re) != 0 && !strings.HasPrefix(str[i][1], "http") && !strings.HasPrefix(str[i][1], "/") {
+		//if len(re) != 0 && !string s.HasPrefix(str[i][1], "http") && !strings.HasPrefix(str[i][1], "/") {
 		//	str[i][1] = "http://" + str[i][1]
 		//}
 

@@ -160,7 +160,7 @@ func OutFilecXlsx(out string, s *Scan) {
 				writeRow(urlsheet, []string{u.Url, u.Source})
 			}
 		}
-
+		//
 		writeRow(urlsheet, []string{""})
 		writeRow(urlsheet, []string{strconv.Itoa(len(Domains)) + " Domain"})
 		for _, u := range Domains {

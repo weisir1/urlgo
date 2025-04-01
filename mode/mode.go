@@ -53,3 +53,5 @@ type Scan struct {
 	UrlResult  []Link
 	InfoResult []Link
 }
+
+//

@@ -41,7 +41,7 @@ func (q *Queue) Pop() interface{} {
 	return v
 }
 
-//返回pop列表和实际长度
+// 返回pop列表和实际长度
 func (q *Queue) Pops(num int) ([]interface{}, int) {
 	vals := make([]interface{}, num)
 	i := 0
@@ -65,7 +65,7 @@ func (q *Queue) Pops(num int) ([]interface{}, int) {
 	return vals, i
 }
 
-func (q *Queue) Remove(v *list.Element) (interface{}) {
+func (q *Queue) Remove(v *list.Element) interface{} {
 	q.l.Lock()
 	defer q.l.Unlock()
 	return q.data.Remove(v)

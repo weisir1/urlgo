@@ -59,7 +59,7 @@ func SelectSort(arr []mode.Link) []mode.Link {
 	}
 }
 
-// 对结果进行URL排序 与分离
+// 对结果进行URL排序与分离
 func UrlDispose(arr []mode.Link) ([]mode.Link, []mode.Link) {
 	var urls []mode.Link
 	var urlts []mode.Link
