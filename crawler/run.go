@@ -24,8 +24,11 @@ import (
 
 var client *http.Client
 
+//var Logger *log.Logger
+
 func load() {
 	//可以直接指定config.yaml,默认
+	//InitLogger("resultLog.txt")
 	if cmd.I {
 		config.GetConfig("config.yaml")
 	}
@@ -289,3 +292,13 @@ func Initialization() {
 	result.Redirect = make(map[string]bool)
 
 }
+
+/*
+func InitLogger(logFileName string) {
+	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	Logger = log.New(logFile, "", log.LstdFlags|log.Lshortfile)
+}
+*/

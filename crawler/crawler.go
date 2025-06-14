@@ -30,6 +30,7 @@ func Spider(s *result.Scan) {
 			if GetEndUrl(s, u, urls[2]) {
 				continue
 			}
+			//Logger.Printf("Start  Spider Target  %s", u)
 			fmt.Printf("\rStart  Spider Target  %s", u)
 
 			isRisk := -1
@@ -46,6 +47,8 @@ func Spider(s *result.Scan) {
 
 			request, err := http.NewRequest("GET", u, nil)
 			if err != nil {
+				fmt.Printf("\n网络请求创建错误-----%v", err)
+				//Logger.Printf("\n网络请求创建错误-----%v", err)
 				continue
 			}
 
@@ -61,8 +64,11 @@ func Spider(s *result.Scan) {
 				util.SetHeadersConfig(&request.Header)
 			}
 			response, err := client.Do(request)
+			//println("----请求结束------")
 			if err != nil {
-				return
+				fmt.Printf("\n网络请求错误-----%v", err)
+				//Logger.Printf("\n网络请求错误-----%v", err)
+				continue
 			}
 			defer response.Body.Close()
 			result := ""
@@ -71,12 +77,17 @@ func Spider(s *result.Scan) {
 
 				reader, err := gzip.NewReader(response.Body) // gzip解压缩
 				if err != nil {
-					return
+					fmt.Printf("\ngizp解压错误-----%v", err)
+					//Logger.Printf("\ngizp解压错误-----%v", err)
+					continue
 				}
 				defer reader.Close()
 				con, err := ioutil.ReadAll(reader)
 				if err != nil {
-					return
+					fmt.Printf("\ngizp解压错误-----%v", err)
+					//Logger.Printf("\ngizp解压错误-----%v", err)
+
+					continue
 				}
 				result = string(con)
 
@@ -112,7 +123,9 @@ func Spider(s *result.Scan) {
 				//}
 				_, err := io.Copy(&resultBuffer, response.Body)
 				if err != nil {
-					return
+					fmt.Printf("\n响应体读取错误-----%v", err)
+					//Logger.Printf("\n响应体读取错误-----%v", err)
+					continue
 				}
 
 				response.Body.Close()
@@ -153,6 +166,7 @@ func Spider(s *result.Scan) {
 			jsFind(s, result, base1, host, scheme, path, u, num)
 			//提取url,待定可添加参数,对参数进行判定是否进行请求
 			urlFind(s, result, base1, host, scheme, path, u, num)
+
 			//提取信息
 			infoFind(s, result, base1, source)
 
