@@ -1,6 +1,7 @@
 package result
 
 import (
+	"bufio"
 	_ "embed"
 	"fmt"
 	"github.com/pingc0y/URLFinder/cmd"
@@ -9,6 +10,8 @@ import (
 	"github.com/pingc0y/URLFinder/util"
 	"github.com/tealeg/xlsx"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +34,18 @@ var (
 	//Jstourl       map[string]string
 	//Urltourl      map[string]string
 	Domains  []string
+	WriteCh  chan string
 	Redirect map[string]bool
+	fileMap  = make(map[string]*os.File)
 )
 
+type ResultProcessor struct {
+	baseURLs  []string
+	fileMap   map[string]*os.File
+	fileMutex sync.Mutex
+	tempFile  string
+	resultDir string
+}
 type Scan struct {
 	UrlQueue   *queue.Queue
 	Ch         chan []string
@@ -43,6 +55,7 @@ type Scan struct {
 	Proxy      string
 	Pakeris    map[string]bool
 	Endurl     map[string][]string
+	Visited    sync.Map
 	JsResult   map[string][]mode.Link
 	UrlResult  map[string][]mode.Link
 	InfoResult map[string][]mode.Info
@@ -62,6 +75,85 @@ func writeRow(sheet *xlsx.Sheet, rowData []string) {
 		cell := row.AddCell()
 		cell.SetString(cellData)
 	}
+}
+
+func CleanResultDir(dirname string) error {
+	// 删除现有目录（如果存在）
+	if _, err := os.Stat(dirname); !os.IsNotExist(err) {
+		if err := os.RemoveAll(dirname); err != nil {
+			log.Printf("旧目录清理失败: %v\n", err)
+			return err
+		}
+		log.Printf("已清理旧目录: %s", dirname)
+	}
+
+	// 创建全新目录
+	return os.MkdirAll(dirname, 0755)
+}
+
+func initFile() {
+	CleanResultDir("results")
+	for _, url := range Baseurl {
+		safeName := sanitizeFileName(url)
+		f, err := os.OpenFile(
+			filepath.Join("results", safeName+".txt"),
+			os.O_WRONLY|os.O_CREATE|os.O_APPEND,
+			0644,
+		)
+		if err != nil {
+			log.Printf("%s创建失败---%v", safeName, err)
+		}
+		fileMap[safeName] = f
+	}
+
+}
+func ClassifyResults() {
+	initFile()
+	defer closeAll()
+
+	// 读取临时文件
+	file, err := os.Open("tmp.txt")
+	defer file.Close()
+
+	if err != nil {
+		log.Printf("读取临时文件失败: %v", err)
+		return
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, ",")
+		if len(parts) < 1 {
+			continue
+		}
+
+		baseURL := sanitizeFileName(parts[0])
+		if f, exists := fileMap[baseURL]; exists {
+			if _, err := f.WriteString(line + "\n"); err != nil {
+				log.Printf("写入%s失败: %v", baseURL, err)
+			}
+		} else {
+			log.Printf("发现未预创建的URL: %s", baseURL)
+		}
+	}
+
+	// 清理临时文件
+	//if err := os.Remove("tmp.txt"); err != nil {
+	//	log.Printf("删除临时文件失败: %v", err)
+	//}
+}
+func closeAll() {
+	for _, f := range fileMap {
+		f.Close()
+	}
+}
+func sanitizeFileName(name string) string {
+	return strings.NewReplacer("/", "_", "\\", "_", ":", "_").Replace(name)
 }
 func OutFilecXlsx(out string, s *Scan) {
 

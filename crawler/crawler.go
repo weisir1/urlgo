@@ -27,9 +27,12 @@ func Spider(s *result.Scan) {
 
 			num, _ := strconv.Atoi(urls[1])
 			u, _ := url.QueryUnescape(urls[0])
-			if GetEndUrl(s, u, urls[2]) {
+			if _, loaded := s.Visited.LoadOrStore(urls[2], true); loaded {
 				continue
 			}
+			//if GetEndUrl(s, u, urls[2]) {
+			//	continue
+			//}
 			//Logger.Printf("Start  Spider Target  %s", u)
 			fmt.Printf("\rStart  Spider Target  %s", u)
 
@@ -42,8 +45,9 @@ func Spider(s *result.Scan) {
 			if isRisk == 1 {
 				continue
 			}
+
 			//}
-			AppendEndUrl(s, u, urls[2]) //添加历史请求列表
+			//AppendEndUrl(s, u, urls[2]) //添加历史请求列表
 
 			request, err := http.NewRequest("GET", u, nil)
 			if err != nil {

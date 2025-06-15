@@ -92,7 +92,7 @@ func load() {
 			return nil
 		},
 	}
-
+	//Init()
 	result.Initfilecreatename()
 
 }
@@ -128,6 +128,7 @@ func Run() {
 	if cmd.F != "" {
 		// 创建句柄
 		Initialization()
+		Init()
 		urls := LocalFile(cmd.F)
 		i := len(urls)
 		s := NewScan(urls, min(i, cmd.T))
@@ -135,19 +136,29 @@ func Run() {
 		//r := bufio.NewReader(fi) // 创建 Reader
 
 		StartScan(s)
+		close(result.WriteCh)
+
+		//close(result.WriteCh)
 		Res(s)
 		fmt.Println("----------------------------------------")
 		return
 	}
 
 	Initialization()
+	Init()
+
 	cmd.U = util.GetProtocol(cmd.U)
 	s := NewScan([]string{cmd.U}, 1)
 	StartScan(s)
-	Res(s)
+	close(result.WriteCh)
+
+	//close(result.WriteCh)
+
+	//Res(s)
 }
 
 func Res(s *result.Scan) {
+
 	if len(s.JsResult) == 0 && len(s.UrlResult) == 0 {
 		fmt.Println("未获取到数据")
 		return
@@ -220,12 +231,14 @@ func NewScan(urls []string, thread int) *result.Scan {
 		Ch:       make(chan []string, thread),
 		Wg:       sync.WaitGroup{},
 		Thread:   thread,
-		Endurl:   map[string][]string{},
-		Pakeris:  map[string]bool{},
+
+		Endurl:  map[string][]string{},
+		Visited: sync.Map{},
+		Pakeris: map[string]bool{},
 		//Output:     output,
-		JsResult:   make(map[string][]mode.Link),
-		UrlResult:  make(map[string][]mode.Link),
-		InfoResult: make(map[string][]mode.Info),
+		JsResult:   make(map[string][]mode.Link, 1000),
+		UrlResult:  make(map[string][]mode.Link, 1000),
+		InfoResult: make(map[string][]mode.Info, 1000),
 	}
 
 	for _, url := range urls {
@@ -286,11 +299,40 @@ func Initialization() {
 	//result.EndUrl = []string{}
 	result.Baseurl = []string{}
 	result.Domains = []string{}
+	result.WriteCh = make(chan string, 100)
 	//result.Jsinurl = make(map[string]string)
 	//result.Jstourl = make(map[string]string)
 	//result.Urltourl = make(map[string]string)
 	result.Redirect = make(map[string]bool)
 
+}
+
+func Init() {
+	// 初始化channel
+
+	// 启动写入goroutine
+	go func() {
+
+		if err := createResultsDir(); err != nil {
+			log.Printf("创建results目录失败：%v", err)
+		}
+		// 打开文件
+		f, err := os.Create("tmp.txt")
+		if err != nil {
+			fmt.Printf("写入临时文件错误-----------------%v", err)
+		}
+		defer f.Close()
+
+		for line := range result.WriteCh {
+			_, err := f.WriteString(line)
+			if err != nil {
+				log.Println("写入文件错误：", err)
+			}
+		}
+	}()
+}
+func createResultsDir() error {
+	return os.MkdirAll("results", os.ModePerm)
 }
 
 /*

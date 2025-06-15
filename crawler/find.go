@@ -160,9 +160,10 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
+			result.WriteCh <- fmt.Sprintf("----Baserl: %s, ----Source: %s, ----jsPath: %s\n", baseurl, source, js)
+			//config.Lock.Lock()
+			//s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: js, Source: source, Baseurl: baseurl})
+			//config.Lock.Unlock()
 
 			if num <= config.JsSteps {
 				s.UrlQueue.Push([]string{js, strconv.Itoa(num + 1), baseurl})
@@ -173,24 +174,31 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: scheme + ":" + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
+
+			result.WriteCh <- fmt.Sprintf("----Baserl: %s, ----Source: %s, ----jsPath: %s\n", baseurl, source, scheme+":"+js)
+
+			//config.Lock.Lock()
+			//s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: scheme + ":" + js, Source: source, Baseurl: baseurl})
+			//config.Lock.Unlock()
 
 			if num <= config.JsSteps {
 				s.UrlQueue.Push([]string{scheme + ":" + js, strconv.Itoa(num + 1), baseurl})
 			}
 		} else if strings.HasPrefix(js, "/") {
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
+			result.WriteCh <- fmt.Sprintf("----Baserl: %s, ----Source: %s, ----jsPath: %s\n", baseurl, source, host+js)
+
+			//config.Lock.Lock()
+			//s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + js, Source: source, Baseurl: baseurl})
+			//config.Lock.Unlock()
 			if num <= config.JsSteps {
 				s.UrlQueue.Push([]string{host + js, strconv.Itoa(num + 1), baseurl})
 			}
 		} else {
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + cata + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
+			result.WriteCh <- fmt.Sprintf("----Baserl: %s, ----Source: %s, ----jsPath: %s\n", baseurl, source, host+cata+js)
+
+			//config.Lock.Lock()
+			//s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + cata + js, Source: source, Baseurl: baseurl})
+			//config.Lock.Unlock()
 			if num <= config.JsSteps {
 				s.UrlQueue.Push([]string{host + cata + js, strconv.Itoa(num + 1), baseurl})
 			}
@@ -226,9 +234,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 			if cmd.M == 2 {
 				if strings.Contains(url[1], "https:") || strings.Contains(url[1], "http:") {
 					//host外的暂时不进行盲目请求,记录到文档中
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: url[1], Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baserl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, url[1])
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: url[1], Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
@@ -237,9 +248,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					}
 
 				} else if strings.Contains(url[1], "//") {
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: scheme + ":" + url[1], Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, scheme+":"+url[1])
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: scheme + ":" + url[1], Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
@@ -255,9 +269,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, urlz)
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 					if num <= config.UrlSteps {
 						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
 					}
@@ -273,9 +290,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + cata + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, urlz)
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 					if num <= config.UrlSteps {
 						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
 					}
@@ -294,9 +314,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, urlz)
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 
 				} else {
 
@@ -310,9 +333,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + cata + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+
+					result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----urlPath: %s\n", baseurl, source, urlz)
+
+					//config.Lock.Lock()
+					//s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+					//config.Lock.Unlock()
 
 				}
 			}
@@ -368,9 +394,36 @@ func infoFind(s *result.Scan, cont, baseurl string, source string) {
 	info.Source = source
 	info.Baseurl = baseurl
 	if len(info.Phone) != 0 || len(info.IDcard) != 0 || len(info.JWT) != 0 || len(info.Email) != 0 || len(info.Other) != 0 {
-		config.Lock.Lock()
-		s.InfoResult[baseurl] = append(s.InfoResult[baseurl], info)
-		config.Lock.Unlock()
+		//infoStr := fmt.Sprintf(
+		//	"----Baseurl: %s, ----Source: %s, Phones: %v, Emails: %v, IDcards: %v, JWTs: %v, Others: %v\n",
+		//	info.Baseurl, info.Source, info.Phone, info.Email, info.IDcard, info.JWT, info.Other,
+		//)
+		infoStr := fmt.Sprintf("----Baseurl: %q, ----Source: %q, ----Phone: %q, ----Email: %q, ----IDcard: %q, ----JWT: %q, ----Other: %q\n",
+			info.Baseurl,
+			info.Source,
+			joinStrings(info.Phone),
+			joinStrings(info.Email),
+			joinStrings(info.IDcard),
+			joinStrings(info.JWT),
+			joinStrings(info.Other),
+		)
+		result.WriteCh <- infoStr
+
+		//config.Lock.Lock()
+		//s.InfoResult[baseurl] = append(s.InfoResult[baseurl], info)
+		//config.Lock.Unlock()
 	}
 
+}
+func joinStrings(slice []string) string {
+	// 这里可以选择用引号括起来，也可以不
+	var quoted []string
+	for _, s := range slice {
+		// 如果内容中有引号或逗号，用引号括起来，简易处理
+		if strings.ContainsAny(s, "\",") {
+			s = fmt.Sprintf("\"%s\"", strings.ReplaceAll(s, "\"", "\"\"")) // 转义引号
+		}
+		quoted = append(quoted, s)
+	}
+	return strings.Join(quoted, ";")
 }
