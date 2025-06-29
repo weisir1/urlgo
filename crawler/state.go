@@ -21,6 +21,7 @@ func JsState(s *result.Scan, u string, i int, sou string, baseurl string) {
 		config.Wg.Done()
 		<-config.Jsch
 	}()
+
 	if cmd.S == "" {
 		s.JsResult[baseurl][i].Url = u
 		return

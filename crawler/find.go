@@ -18,6 +18,7 @@ func getPrejspath(data string) string {
 	if len(data) > 50 {
 		Prematch = Preregex.FindAllString(data[:50], -1)
 	}
+
 	//fmt.Println(Prematch)
 	for _, prematch := range Prematch {
 		prematch = strings.ReplaceAll(prematch, "\"", "")
