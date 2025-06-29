@@ -100,7 +100,6 @@ func OutFilecXlsx(out string, s *Scan) {
 		writeRow(jssheet, []string{"jsurl", "Status", "Size", "Title", "Redirect", "Source"})
 		writeRow(urlsheet, []string{"url", "Status", "Size", "Title", "Redirect", "Source"})
 	}
-	//saveInterval := 100
 	if len(s.UrlResult) != 0 || len(s.JsResult) != 0 {
 		for _, url := range Baseurl {
 			urlres := s.UrlResult[url]

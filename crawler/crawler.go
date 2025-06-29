@@ -23,7 +23,6 @@ var bufferPool = sync.Pool{
 	},
 }
 
-// 蜘蛛抓取页面内容
 func Spider(s *result.Scan) {
 	for s.UrlQueue.Len() != 0 {
 		dataface := s.UrlQueue.Pop()

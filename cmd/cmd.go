@@ -24,7 +24,6 @@ var (
 	G  int
 	FF string
 	O  string
-	//nO string
 	X  string
 	T  = 0
 	TI = 3

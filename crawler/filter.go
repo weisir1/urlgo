@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// 过滤JS
 func jsFilter(str []string) []string {
 	//对不需要的数据过滤
 	for i := range str {

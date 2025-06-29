@@ -78,7 +78,6 @@ var (
 	//	`["']?private[_-]?key[_-]?(id)?["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?`,
 	//	`["']?account[_-]?(name|key)?["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?`,
 	//}
-	//
 	Other = []string{
 		//敏感
 		//`["']?(admin[_-]?email|app[_-]?id|username|account|account[_-]?(name|key)?|account[_-]?sid|(?i)[\w_-]*?token[\w_-]*?|[\w_-]*?secret[\w_-]*?|private[_-]?key[_-]?|app[_-]?key|[\w_-]*access[_-]?key[\w_-]*|cameraindexcode|user|encryptkey|[\w_-]*?bucket[\w_-]*?|[\w_-]*?api[_-]?key[\w_-]*?)["']?\s*[:=]\s*["']?[a-z0-9!@#$%&*]["']?`,
