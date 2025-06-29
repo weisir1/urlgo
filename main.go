@@ -14,7 +14,6 @@ func main() {
 	//cmd.M = 2
 	//cmd.F = "url.txt"
 	//cmd.S = "all"
-	//cmd.X = "http://127.0.0.1:8080"
 	//cmd.M = 2
 	//cmd.Parse()
 	crawler.Run()
