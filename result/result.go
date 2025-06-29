@@ -3,11 +3,11 @@ package result
 import (
 	_ "embed"
 	"fmt"
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/mode"
-	"github.com/pingc0y/URLFinder/queue"
-	"github.com/pingc0y/URLFinder/util"
 	"github.com/tealeg/xlsx"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/mode"
+	"github.com/weisir1/URLGo/queue"
+	"github.com/weisir1/URLGo/util"
 	"log"
 	"strconv"
 	"strings"
@@ -46,6 +46,7 @@ type Scan struct {
 	JsResult   map[string][]mode.Link
 	UrlResult  map[string][]mode.Link
 	InfoResult map[string][]mode.Info
+	Visited    sync.Map
 }
 
 func Initfilecreatename() {
@@ -100,122 +101,176 @@ func OutFilecXlsx(out string, s *Scan) {
 		writeRow(urlsheet, []string{"url", "Status", "Size", "Title", "Redirect", "Source"})
 	}
 	//saveInterval := 100
-	for _, url := range Baseurl {
-		urlres := s.UrlResult[url]
-		jsres := s.JsResult[url]
-		infores := s.InfoResult[url]
-		if urlres == nil {
-			urlres = []mode.Link{}
-		}
-		if jsres == nil {
-			jsres = []mode.Link{}
-		}
-		if infores == nil {
-			infores = []mode.Info{}
-		}
-		urlres = util.RemoveDuplicatesLink(urlres) // 去重
-		jsres = util.RemoveDuplicatesLink(jsres)   // 去重
+	if len(s.UrlResult) != 0 || len(s.JsResult) != 0 {
+		for _, url := range Baseurl {
+			urlres := s.UrlResult[url]
+			jsres := s.JsResult[url]
 
-		if cmd.S != "" {
-			urlres = util.SelectSort(urlres)
-			jsres = util.SelectSort(jsres)
-		}
-		ResultJsHost, _ := util.UrlDispose(jsres)
-		ResultUrlHost, ResultUrlOther := util.UrlDispose(urlres)
-		Domains = util.GetDomains(util.MergeArray(jsres, urlres))
-		writeRow(jssheet, []string{"", ""})
-		writeRow(jssheet, []string{"", ""})
-		writeRow(jssheet, []string{"baseurl:   " + url})
-		writeRow(jssheet, []string{strconv.Itoa(len(ResultJsHost)) + " JS to " + util.GetHost(cmd.U)})
+			if urlres == nil {
+				urlres = []mode.Link{}
+			}
+			if jsres == nil {
+				jsres = []mode.Link{}
+			}
 
-		for _, j := range ResultJsHost {
+			urlres = util.RemoveDuplicatesLink(urlres) // 去重
+			jsres = util.RemoveDuplicatesLink(jsres)   // 去重
+
 			if cmd.S != "" {
-				writeRow(jssheet, []string{j.Url, j.Status, j.Size, "", j.Redirect, j.Source})
-			} else {
-				writeRow(jssheet, []string{j.Url, j.Source})
+				urlres = util.SelectSort(urlres)
+				jsres = util.SelectSort(jsres)
 			}
-		}
+			ResultJsHost, _ := util.UrlDispose(jsres)
+			ResultUrlHost, ResultUrlOther := util.UrlDispose(urlres)
+			Domains = util.GetDomains(util.MergeArray(jsres, urlres))
+			writeRow(jssheet, []string{"", ""})
+			writeRow(jssheet, []string{"", ""})
+			writeRow(jssheet, []string{"baseurl:   " + url})
+			writeRow(jssheet, []string{strconv.Itoa(len(ResultJsHost)) + " JS to " + util.GetHost(cmd.U)})
 
-		writeRow(urlsheet, []string{"", ""})
-		writeRow(urlsheet, []string{"", ""})
-		writeRow(urlsheet, []string{"baseurl:   " + url})
-		writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlHost)) + " URL to " + util.GetHost(cmd.U)})
-
-		for _, u := range ResultUrlHost {
-			if cmd.S != "" {
-				writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
-			} else {
-				writeRow(urlsheet, []string{u.Url, u.Source})
-			}
-		}
-
-		writeRow(urlsheet, []string{""})
-		writeRow(urlsheet, []string{""})
-		writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlOther)) + " Other URL to " + util.GetHost(cmd.U)})
-
-		for _, u := range ResultUrlOther {
-			if cmd.S != "" {
-				writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
-			} else {
-				writeRow(urlsheet, []string{u.Url, u.Source})
-			}
-		}
-		//
-		writeRow(urlsheet, []string{""})
-		writeRow(urlsheet, []string{strconv.Itoa(len(Domains)) + " Domain"})
-		for _, u := range Domains {
-			writeRow(urlsheet, []string{u})
-		}
-
-		writeRow(infosheet, []string{"", ""})
-		writeRow(infosheet, []string{"", ""})
-		writeRow(infosheet, []string{"BaseUrl:     " + url})
-		writeRow(infosheet, []string{"Phone"})
-		for i := range infores {
-			for i2 := range infores[i].Phone {
-				writeRow(infosheet, []string{infores[i].Phone[i2], "", "", "", infores[i].Source})
-			}
-		}
-		writeRow(infosheet, []string{""})
-		writeRow(infosheet, []string{"Email"})
-		for i := range infores {
-			for i2 := range infores[i].Email {
-				writeRow(infosheet, []string{infores[i].Email[i2], "", "", "", infores[i].Source})
-			}
-		}
-		writeRow(infosheet, []string{""})
-		writeRow(infosheet, []string{"IDcard"})
-		for i := range infores {
-			for i2 := range infores[i].IDcard {
-				writeRow(infosheet, []string{infores[i].IDcard[i2], "", "", "", infores[i].Source})
-			}
-		}
-		writeRow(infosheet, []string{""})
-		writeRow(infosheet, []string{"JWT"})
-		for i := range infores {
-			for i2 := range infores[i].JWT {
-				writeRow(infosheet, []string{infores[i].JWT[i2], "", "", "", infores[i].Source})
-			}
-		}
-		writeRow(infosheet, []string{""})
-		writeRow(infosheet, []string{"Other"})
-		tmps := ""
-		for i := range infores {
-			for i2 := range infores[i].Other {
-				if strings.Contains(tmps, infores[i].Other[i2]) {
-					continue
+			for _, j := range ResultJsHost {
+				if cmd.S != "" {
+					writeRow(jssheet, []string{j.Url, j.Status, j.Size, "", j.Redirect, j.Source})
+				} else {
+					writeRow(jssheet, []string{j.Url, j.Source})
 				}
-				tmps += infores[i].Other[i2]
-				writeRow(infosheet, []string{infores[i].Other[i2], "", "", "", infores[i].Source})
+			}
+
+			writeRow(urlsheet, []string{"", ""})
+			writeRow(urlsheet, []string{"", ""})
+			writeRow(urlsheet, []string{"baseurl:   " + url})
+			writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlHost)) + " URL to " + util.GetHost(cmd.U)})
+
+			for _, u := range ResultUrlHost {
+				if cmd.S != "" {
+					writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
+				} else {
+					writeRow(urlsheet, []string{u.Url, u.Source})
+				}
+			}
+
+			writeRow(urlsheet, []string{""})
+			writeRow(urlsheet, []string{""})
+			writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlOther)) + " Other URL to " + util.GetHost(cmd.U)})
+
+			for _, u := range ResultUrlOther {
+				if cmd.S != "" {
+					writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
+				} else {
+					writeRow(urlsheet, []string{u.Url, u.Source})
+				}
+			}
+			//
+			writeRow(urlsheet, []string{""})
+			writeRow(urlsheet, []string{strconv.Itoa(len(Domains)) + " Domain"})
+			for _, u := range Domains {
+				writeRow(urlsheet, []string{u})
+			}
+
+			infores := s.InfoResult[url]
+			if infores == nil {
+				infores = []mode.Info{}
+			}
+			writeRow(infosheet, []string{"", ""})
+			writeRow(infosheet, []string{"", ""})
+			writeRow(infosheet, []string{"BaseUrl:     " + url})
+			writeRow(infosheet, []string{"Phone"})
+			for i := range infores {
+				for i2 := range infores[i].Phone {
+					writeRow(infosheet, []string{infores[i].Phone[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"Email"})
+			for i := range infores {
+				for i2 := range infores[i].Email {
+					writeRow(infosheet, []string{infores[i].Email[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"IDcard"})
+			for i := range infores {
+				for i2 := range infores[i].IDcard {
+					writeRow(infosheet, []string{infores[i].IDcard[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"JWT"})
+			for i := range infores {
+				for i2 := range infores[i].JWT {
+					writeRow(infosheet, []string{infores[i].JWT[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"Other"})
+			tmps := ""
+			for i := range infores {
+				for i2 := range infores[i].Other {
+					if strings.Contains(tmps, infores[i].Other[i2]) {
+						continue
+					}
+					tmps += infores[i].Other[i2]
+					writeRow(infosheet, []string{infores[i].Other[i2], "", "", "", infores[i].Source})
+				}
+			}
+			//if i > 0 && i%saveInterval == 0 {
+			//	err := file.Save(fileName)
+			//	if err != nil {
+			//		log.Fatalf("Failed to save file: %v", err)
+			//	}
+			//}
+		}
+	} else if len(s.InfoResult) != 0 {
+		for _, url := range Baseurl {
+			infores := s.InfoResult[url]
+			if infores == nil {
+				infores = []mode.Info{}
+			}
+			writeRow(infosheet, []string{"", ""})
+			writeRow(infosheet, []string{"", ""})
+			writeRow(infosheet, []string{"BaseUrl:     " + url})
+			writeRow(infosheet, []string{"Phone"})
+			for i := range infores {
+				for i2 := range infores[i].Phone {
+					writeRow(infosheet, []string{infores[i].Phone[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"Email"})
+			for i := range infores {
+				for i2 := range infores[i].Email {
+					writeRow(infosheet, []string{infores[i].Email[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"IDcard"})
+			for i := range infores {
+				for i2 := range infores[i].IDcard {
+					writeRow(infosheet, []string{infores[i].IDcard[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"JWT"})
+			for i := range infores {
+				for i2 := range infores[i].JWT {
+					writeRow(infosheet, []string{infores[i].JWT[i2], "", "", "", infores[i].Source})
+				}
+			}
+			writeRow(infosheet, []string{""})
+			writeRow(infosheet, []string{"Other"})
+			tmps := ""
+			for i := range infores {
+				for i2 := range infores[i].Other {
+					if strings.Contains(tmps, infores[i].Other[i2]) {
+						continue
+					}
+					tmps += infores[i].Other[i2]
+					writeRow(infosheet, []string{infores[i].Other[i2], "", "", "", infores[i].Source})
+				}
 			}
 		}
-		//if i > 0 && i%saveInterval == 0 {
-		//	err := file.Save(fileName)
-		//	if err != nil {
-		//		log.Fatalf("Failed to save file: %v", err)
-		//	}
-		//}
 	}
+
 	err = file.Save(fileName)
 	if err != nil {
 		log.Fatalf("Failed to save file: %v", err)

@@ -21,12 +21,13 @@ var (
 	A  string
 	B  string
 	F  string
+	G  int
 	FF string
 	O  string
 	//nO string
 	X  string
-	T  = 50
-	TI = 0
+	T  = 0
+	TI = 3
 	MA = 99999
 	Z  int
 )
@@ -36,6 +37,8 @@ func init() {
 	flag.StringVar(&B, "b", "", "set baseurl\n设置baseurl路径")
 	flag.StringVar(&C, "c", "", "set cookie\n设置cookie")
 	//flag.StringVar(&D, "d", "", "set domainName\n指定获取的域名,支持正则表达式")
+	flag.IntVar(&G, "g", 0, "set module\n设置模式,爬取结果包含url、js路径,否则只爬取敏感信息,默认为0爬取")
+
 	flag.StringVar(&F, "f", "", "set urlFile\n批量抓取url,指定文件路径,默认url.txt")
 	//flag.StringVar(&FF, "ff", "", "set urlFile one\n与-f区别：全部抓取的数据,视为同一个url的结果来处理（只打印一份结果 | 只会输出一份结果）")
 	flag.BoolVar(&H, "h", false, "this help\n帮助信息")

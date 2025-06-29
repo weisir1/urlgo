@@ -1,7 +1,7 @@
 package mode
 
 import (
-	"github.com/pingc0y/URLFinder/queue"
+	"github.com/weisir1/URLGo/queue"
 	"sync"
 )
 
@@ -9,6 +9,7 @@ type Config struct {
 	Proxy      string              `yaml:"proxy"`
 	Timeout    int                 `yaml:"timeout"`
 	Thread     int                 `yaml:"thread"`
+	Module     int                 `yaml:"module"`
 	UrlSteps   int                 `yaml:"urlSteps"`
 	JsSteps    int                 `yaml:"jsSteps"`
 	Max        int                 `yaml:"max"`

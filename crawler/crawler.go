@@ -4,18 +4,24 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/config"
-	"github.com/pingc0y/URLFinder/result"
-	"github.com/pingc0y/URLFinder/util"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/config"
+	"github.com/weisir1/URLGo/result"
+	"github.com/weisir1/URLGo/util"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
 
 // 蜘蛛抓取页面内容
 func Spider(s *result.Scan) {
@@ -27,10 +33,13 @@ func Spider(s *result.Scan) {
 
 			num, _ := strconv.Atoi(urls[1])
 			u, _ := url.QueryUnescape(urls[0])
-			if GetEndUrl(s, u, urls[2]) {
+			if strings.Contains(u, "/js/js/") {
+				u = strings.Replace(u, "/js/js/", "/js/", -1)
+			}
+			if _, loaded := s.Visited.LoadOrStore(u, true); loaded {
 				continue
 			}
-			fmt.Printf("\rStart  Spider Target  %s", u)
+			fmt.Printf("Start  Spider Target  %s, 爬取步数%s\n", u, num)
 
 			isRisk := -1
 			for _, v := range config.Risks {
@@ -62,28 +71,34 @@ func Spider(s *result.Scan) {
 			}
 			response, err := client.Do(request)
 			if err != nil {
-				return
+				continue
 			}
+			num = num + 1
 			defer response.Body.Close()
 			result := ""
 
 			if response.Header.Get("Content-Encoding") == "gzip" {
 
+				buffer := bufferPool.Get().(*bytes.Buffer)
+				defer bufferPool.Put(buffer)
+				buffer.Reset()
 				reader, err := gzip.NewReader(response.Body) // gzip解压缩
 				if err != nil {
-					return
+					continue
 				}
 				defer reader.Close()
-				con, err := ioutil.ReadAll(reader)
+				_, err = io.Copy(buffer, reader)
+				//con, err := ioutil.ReadAll(reader)
 				if err != nil {
-					return
+					continue
 				}
-				result = string(con)
+				result = buffer.String()
 
 			} else {
 
-				var resultBuffer bytes.Buffer
-
+				buffer := bufferPool.Get().(*bytes.Buffer)
+				defer bufferPool.Put(buffer)
+				buffer.Reset()
 				//file, err := os.Create("output.txt")
 				//if err != nil {
 				//	fmt.Println("Failed to create file:", err)
@@ -110,14 +125,15 @@ func Spider(s *result.Scan) {
 				//	}
 				//	resultBuffer.Write(buf[:n]) // 将读取的内容写入缓冲区
 				//}
-				_, err := io.Copy(&resultBuffer, response.Body)
+				_, err := io.Copy(buffer, response.Body)
 				if err != nil {
-					return
+					fmt.Printf("响应体读取错误-%v", err)
+					continue
 				}
 
 				response.Body.Close()
 				////将缓冲区内容转换为字符串
-				result = resultBuffer.String()
+				result = buffer.String()
 				//dataBytes, err := ioutil.ReadAll(response.Body)
 				//if err != nil {
 				//	return
@@ -153,6 +169,7 @@ func Spider(s *result.Scan) {
 			jsFind(s, result, base1, host, scheme, path, u, num)
 			//提取url,待定可添加参数,对参数进行判定是否进行请求
 			urlFind(s, result, base1, host, scheme, path, u, num)
+
 			//提取信息
 			infoFind(s, result, base1, source)
 

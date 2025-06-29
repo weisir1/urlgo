@@ -1,8 +1,8 @@
 package crawler
 
 import (
-	"github.com/pingc0y/URLFinder/config"
-	"github.com/pingc0y/URLFinder/util"
+	"github.com/weisir1/URLGo/config"
+	"github.com/weisir1/URLGo/util"
 	"net/url"
 	"regexp"
 	"strings"
@@ -10,8 +10,6 @@ import (
 
 // 过滤JS
 func jsFilter(str []string) []string {
-	//对提取的js进行去重
-	str = util.RemoveDuplicates(str)
 	//对不需要的数据过滤
 	for i := range str {
 		str[i], _ = url.QueryUnescape(str[i])
@@ -28,6 +26,10 @@ func jsFilter(str []string) []string {
 			str[i] = ""
 			continue
 		}
+		if strings.HasPrefix(str[i], "./") {
+			str[i] = strings.Replace(str[i], "./", "/", -1)
+		}
+		//对提取的js进行去重
 
 		//过滤配置的黑名单
 		//for i2 := range config.JsFiler {
@@ -40,13 +42,14 @@ func jsFilter(str []string) []string {
 		//}
 
 	}
+	str = util.RemoveDuplicates(str)
+
 	return str
 
 }
 
 // 过滤URL
 func urlFilter(str [][]string) [][]string {
-	str = util.RemoveDuplicate(str)
 	Risks := []string{"remove", "delete", "insert", "update", "logout"}
 	//对不需要的数据过滤
 	for i := range str {
@@ -66,6 +69,9 @@ func urlFilter(str [][]string) [][]string {
 		str[i][1] = strings.Replace(str[i][1], `"`, "", -1)
 		if str[i][1] == "/" || str[i][1] == "//" {
 			str[i][1] = ""
+		}
+		if strings.HasPrefix(str[i][1], "./") {
+			str[i][1] = strings.Replace(str[i][1], `./`, "/", -1)
 		}
 
 		for i2 := range config.UrlFiler {
@@ -91,5 +97,7 @@ func urlFilter(str [][]string) [][]string {
 		//过滤配置的黑名单
 
 	}
+	str = util.RemoveDuplicate(str)
+
 	return str
 }

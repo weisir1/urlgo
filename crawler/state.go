@@ -1,11 +1,11 @@
 package crawler
 
 import (
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/config"
-	"github.com/pingc0y/URLFinder/mode"
-	"github.com/pingc0y/URLFinder/result"
-	"github.com/pingc0y/URLFinder/util"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/config"
+	"github.com/weisir1/URLGo/mode"
+	"github.com/weisir1/URLGo/result"
+	"github.com/weisir1/URLGo/util"
 	"io"
 	"net/http"
 	"net/url"

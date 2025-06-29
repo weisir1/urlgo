@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/mode"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/mode"
 	"gopkg.in/yaml.v3"
 	"os"
 	"strings"
@@ -97,6 +97,7 @@ var (
 var (
 	UrlSteps = 2
 	JsSteps  = 3
+	Module   = 0
 )
 
 var (
@@ -119,6 +120,7 @@ func GetConfig(path string) {
 			Conf.JsFiler = JsFiler
 			Conf.UrlFiler = UrlFiler
 			Conf.JsFuzzPath = JsFuzzPath
+			Conf.Module = cmd.G
 			Conf.JsSteps = JsSteps
 			Conf.UrlSteps = UrlSteps
 			Conf.Risks = Risks
@@ -151,6 +153,7 @@ func GetConfig(path string) {
 		Jwt = Conf.InfoFind["Jwt"]
 		Other = Conf.InfoFind["Other"]
 		JsSteps = Conf.JsSteps
+		cmd.G = Conf.Module
 		UrlSteps = Conf.UrlSteps
 		Risks = Conf.Risks
 		cmd.T = Conf.Thread

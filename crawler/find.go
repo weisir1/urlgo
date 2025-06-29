@@ -3,10 +3,10 @@ package crawler
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/config"
-	"github.com/pingc0y/URLFinder/mode"
-	"github.com/pingc0y/URLFinder/result"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/config"
+	"github.com/weisir1/URLGo/mode"
+	"github.com/weisir1/URLGo/result"
 	"regexp"
 	"strconv"
 	"strings"
@@ -160,11 +160,14 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
 
-			if num <= config.JsSteps {
+			if cmd.G == 0 {
+				config.Lock.Lock()
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: js, Source: source, Baseurl: baseurl})
+				config.Lock.Unlock()
+			}
+
+			if num < config.JsSteps {
 				s.UrlQueue.Push([]string{js, strconv.Itoa(num + 1), baseurl})
 			}
 
@@ -173,25 +176,31 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: scheme + ":" + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
+			if cmd.G == 0 {
+				config.Lock.Lock()
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: scheme + ":" + js, Source: source, Baseurl: baseurl})
+				config.Lock.Unlock()
+			}
 
-			if num <= config.JsSteps {
+			if num < config.JsSteps {
 				s.UrlQueue.Push([]string{scheme + ":" + js, strconv.Itoa(num + 1), baseurl})
 			}
 		} else if strings.HasPrefix(js, "/") {
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
-			if num <= config.JsSteps {
+			if cmd.G == 0 {
+				config.Lock.Lock()
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + js, Source: source, Baseurl: baseurl})
+				config.Lock.Unlock()
+			}
+			if num < config.JsSteps {
 				s.UrlQueue.Push([]string{host + js, strconv.Itoa(num + 1), baseurl})
 			}
 		} else {
-			config.Lock.Lock()
-			s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + cata + js, Source: source, Baseurl: baseurl})
-			config.Lock.Unlock()
-			if num <= config.JsSteps {
+			if cmd.G == 0 {
+				config.Lock.Lock()
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + cata + js, Source: source, Baseurl: baseurl})
+				config.Lock.Unlock()
+			}
+			if num < config.JsSteps {
 				s.UrlQueue.Push([]string{host + cata + js, strconv.Itoa(num + 1), baseurl})
 			}
 		}
@@ -226,24 +235,28 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 			if cmd.M == 2 {
 				if strings.Contains(url[1], "https:") || strings.Contains(url[1], "http:") {
 					//host外的暂时不进行盲目请求,记录到文档中
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: url[1], Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+					if cmd.G == 0 {
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: url[1], Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
-					if num <= config.UrlSteps {
+					if num < config.UrlSteps {
 						s.UrlQueue.Push([]string{url[1], strconv.Itoa(num + 1), baseurl})
 					}
 
 				} else if strings.Contains(url[1], "//") {
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: scheme + ":" + url[1], Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+					if cmd.G == 0 {
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: scheme + ":" + url[1], Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
-					if num <= config.UrlSteps {
+					if num < config.UrlSteps {
 						s.UrlQueue.Push([]string{scheme + ":" + url[1], strconv.Itoa(num + 1), baseurl})
 					}
 
@@ -255,14 +268,16 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
-					if num <= config.UrlSteps {
+					if cmd.G == 0 {
+
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
+					if num < config.UrlSteps {
 						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
 					}
 				} else {
-
 					urlz := ""
 					if cmd.B != "" {
 						if strings.HasSuffix(cmd.B, "/") {
@@ -273,16 +288,17 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + cata + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
-					if num <= config.UrlSteps {
+					if cmd.G == 0 {
+
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
+					if num < config.UrlSteps {
 						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
 					}
 				}
-
 			} else {
-
 				if strings.Contains(url[1], "https:") || strings.Contains(url[1], "http:") || strings.Contains(url[1], "//") {
 					if !strings.Contains(url[1], domain) {
 						continue
@@ -294,12 +310,13 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+					if cmd.G == 0 {
 
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
 				} else {
-
 					urlz := ""
 					if cmd.B != "" {
 						if strings.HasSuffix(cmd.B, "/") {
@@ -310,10 +327,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + cata + url[1]
 					}
-					config.Lock.Lock()
-					s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
-					config.Lock.Unlock()
+					if cmd.G == 0 {
 
+						config.Lock.Lock()
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
+						config.Lock.Unlock()
+					}
 				}
 			}
 		}
@@ -372,5 +391,4 @@ func infoFind(s *result.Scan, cont, baseurl string, source string) {
 		s.InfoResult[baseurl] = append(s.InfoResult[baseurl], info)
 		config.Lock.Unlock()
 	}
-
 }

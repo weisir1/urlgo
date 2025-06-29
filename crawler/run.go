@@ -6,12 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gookit/color"
-	"github.com/pingc0y/URLFinder/cmd"
-	"github.com/pingc0y/URLFinder/config"
-	"github.com/pingc0y/URLFinder/mode"
-	"github.com/pingc0y/URLFinder/queue"
-	"github.com/pingc0y/URLFinder/result"
-	"github.com/pingc0y/URLFinder/util"
+	"github.com/weisir1/URLGo/cmd"
+	"github.com/weisir1/URLGo/config"
+	"github.com/weisir1/URLGo/mode"
+	"github.com/weisir1/URLGo/queue"
+	"github.com/weisir1/URLGo/result"
+	"github.com/weisir1/URLGo/util"
 	"log"
 	"net"
 	"net/http"
@@ -121,13 +121,13 @@ func min(a, b int) int {
 func Run() {
 
 	load()
-
 	if cmd.F != "" {
 		// 创建句柄
 		Initialization()
 		urls := LocalFile(cmd.F)
 		i := len(urls)
-		s := NewScan(urls, min(i, cmd.T))
+		//s := NewScan(urls, min(i, cmd.T))
+		s := NewScan(urls, cmd.T)
 		fmt.Println("加载目标target数量: ", i)
 		//r := bufio.NewReader(fi) // 创建 Reader
 
@@ -145,7 +145,7 @@ func Run() {
 }
 
 func Res(s *result.Scan) {
-	if len(s.JsResult) == 0 && len(s.UrlResult) == 0 {
+	if len(s.JsResult) == 0 && len(s.UrlResult) == 0 && len(s.InfoResult) == 0 {
 		fmt.Println("未获取到数据")
 		return
 	}
@@ -220,6 +220,7 @@ func NewScan(urls []string, thread int) *result.Scan {
 		Endurl:   map[string][]string{},
 		Pakeris:  map[string]bool{},
 		//Output:     output,
+		Visited:    sync.Map{},
 		JsResult:   make(map[string][]mode.Link),
 		UrlResult:  make(map[string][]mode.Link),
 		InfoResult: make(map[string][]mode.Info),
