@@ -6,6 +6,7 @@ import (
 	"github.com/weisir1/URLGo/mode"
 	"gopkg.in/yaml.v3"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -90,29 +91,71 @@ var (
 
 		//wxid ghid
 		`["'](wx[a-z0-9]{15,18})|(ww[a-z0-9]{15,18})|(gh_[a-z0-9]{11,13})["']`,
+		`(oWebControl.JS_RequestInterface)|(jsWebControl)`,
 	}
 )
 
 var (
 	UrlSteps = 2
-	JsSteps  = 3
+	JsSteps  = 4
 	Module   = 0
 )
 
 var (
-	Lock  sync.Mutex
-	Wg    sync.WaitGroup
-	Mux   sync.Mutex
-	Ch    = make(chan int, 50)
-	Jsch  = make(chan int, 50/10*3)
-	Urlch = make(chan int, 50/10*7)
+	Lock sync.Mutex
+	Wg   sync.WaitGroup
+	Mux  sync.Mutex
+	//Ch    = make(chan int, 50)
+	Jsch  chan int
+	Urlch chan int
+
+	JsFindRegexps   []*regexp.Regexp
+	UrlFindRegexps  []*regexp.Regexp
+	InfoFindRegexps map[string][]*regexp.Regexp
 )
+
+func Init(threadNum int) {
+	// 初始化Channel（如果还需要全局channel）
+	//Ch = make(chan int, threadNum)
+	Jsch = make(chan int, threadNum*3/10)
+	Urlch = make(chan int, threadNum*7/10)
+
+	//  预编译JS查找正则
+	JsFindRegexps = make([]*regexp.Regexp, len(JsFind))
+	for i, re := range JsFind {
+		JsFindRegexps[i] = regexp.MustCompile(re)
+	}
+
+	//  预编译URL查找正则
+	UrlFindRegexps = make([]*regexp.Regexp, len(UrlFind))
+	for i, re := range UrlFind {
+		UrlFindRegexps[i] = regexp.MustCompile(re)
+	}
+
+	//  预编译信息查找正则
+	InfoFindRegexps = make(map[string][]*regexp.Regexp)
+	for key, patterns := range map[string][]string{
+		"Phone":  Phone,
+		"Email":  Email,
+		"IDcard": IDcard,
+		"Jwt":    Jwt,
+		"Other":  Other,
+	} {
+		regexps := make([]*regexp.Regexp, len(patterns))
+		for i, pattern := range patterns {
+			regexps[i] = regexp.MustCompile(pattern)
+		}
+		InfoFindRegexps[key] = regexps
+	}
+
+	fmt.Println("配置初始化完成")
+}
 
 // 读取配置文件
 func GetConfig(path string) {
 	if f, err := os.Open(path); err != nil {
 		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
-			Conf.Headers = map[string]string{"Cookie": cmd.C, "User-Agent": `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)  Chrome/80.0.3987.87 Safari/537.36 SE 2.X MetaSr 1.0`, "Accept": "*/*"}
+			Conf.Headers = map[string]string{"Cookie": cmd.C, "Accept": "*/*"}
 			Conf.Proxy = ""
 			Conf.JsFind = JsFind
 			Conf.UrlFind = UrlFind

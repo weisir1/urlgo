@@ -42,6 +42,7 @@ func Jsonppp(par string) map[string]string {
 
 func IsWebpackechunkjs(data string) string {
 
+	//re := regexp.MustCompile(`static/js/"\s*\+\s*e\s*\+\s*"\."\s*\+\s*([\s\S]*?)\.js"`)
 	re := regexp.MustCompile(`\w\.p\s*\+\s*\"([\s\S]*?)\.js"`)
 	matchs := re.FindAllStringSubmatch(data, -1)
 
@@ -63,7 +64,8 @@ func WebpackJsTiQu(data string) []string {
 	//提取前缀如static/js/
 	prejspath := getPrejspath(data)
 
-	regex := regexp.MustCompile(`(\{[^\}]+\})`)
+	//regex := regexp.MustCompile(`(\{[^\}]+\})`)
+	regex := regexp.MustCompile(`"[^"]+"\s*:\s*"[^"]+"`)
 	regexJsSuff := regexp.MustCompile(`\+\s*?"(.{0,10}\.js)"`)
 	// FindAllStringSubmatch 返回所有匹配的字符串以及捕获的子组
 	// 处理数字键： 将数字键用引号包裹
@@ -76,32 +78,42 @@ func WebpackJsTiQu(data string) []string {
 		return nil
 	}
 	var result1 []string
-	var result map[string]string
-	for _, v := range match {
-		err := json.Unmarshal([]byte(v), &result)
-		if err != nil {
-			parse := Jsonppp(v)
-			if len(parse) > 0 {
-				result = parse
-				break
-			}
-			continue
-		}
-		break
-	}
-	if len(result) == 0 {
-		return nil
-	}
+	//var result map[string]string
+	for v := range match {
+		var tmp = match[v]
+		tmp = strings.Replace(tmp, "\"", "", -1)
+		tmp = strings.Replace(tmp, ":", ".", -1)
+		if prejspath == "" {
+			result1 = append(result1, tmp+matchSuff[0][1])
 
-	if prejspath == "" {
-		for k, v := range result {
-			result1 = append(result1, k+"."+v+matchSuff[0][1])
+		} else {
+			result1 = append(result1, prejspath+tmp+matchSuff[0][1])
 		}
-	} else {
-		for k, v := range result {
-			result1 = append(result1, prejspath+k+"."+v+matchSuff[0][1])
-		}
+
+		//err := json.Unmarshal([]byte(v), &result)
+		//if err != nil {
+		//	parse := Jsonppp(v)
+		//	if len(parse) > 0 {
+		//		result = parse
+		//		break
+		//	}
+		//	continue
+		//}
+		//break
 	}
+	//if len(result) == 0 {
+	//	return nil
+	//}
+
+	//if prejspath == "" {
+	//	for k, v := range result {
+	//		result1 = append(result1, k+"."+v+matchSuff[0][1])
+	//	}
+	//} else {
+	//	for k, v := range result {
+	//		result1 = append(result1, prejspath+k+"."+v+matchSuff[0][1])
+	//	}
+	//}
 	return result1
 }
 
@@ -119,14 +131,13 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 	}
 	host = scheme + "://" + host
 	var jss = []string{}
-	for _, re := range config.JsFind {
-		reg := regexp.MustCompile(re)
+
+	for _, reg := range config.JsFindRegexps {
 		jssi := reg.FindAllStringSubmatch(cont, -1)
 		for _, js := range jssi {
 			if js[0] == "" {
 				continue
 			}
-
 			jss = append(jss, js[1])
 		}
 	}
@@ -143,9 +154,9 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 				jss = append(jss, tmp...)
 				fmt.Println(host, "解压装填完毕")
 			}
-			config.Lock.Lock()
-			s.Pakeris[baseurl] = true
-			config.Lock.Unlock()
+			//config.Lock.Lock()
+			//s.Pakeris[baseurl] = true
+			//config.Lock.Unlock()
 		}
 	}
 
@@ -161,6 +172,7 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
+			js = url_fileter(js)
 
 			if cmd.G == 0 {
 				config.Lock.Lock()
@@ -169,7 +181,7 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			}
 
 			if num < config.JsSteps {
-				s.UrlQueue.Push([]string{js, strconv.Itoa(num + 1), baseurl})
+				s.AddURL([]string{js, strconv.Itoa(num), baseurl})
 			}
 
 		} else if strings.HasPrefix(js, "//") {
@@ -177,32 +189,47 @@ func jsFind(s *result.Scan, cont, baseurl string, host, scheme, path, source str
 			if !(strings.Contains(js, domain)) {
 				continue
 			}
+			js = url_fileter(scheme + ":" + js)
 			if cmd.G == 0 {
 				config.Lock.Lock()
-				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: scheme + ":" + js, Source: source, Baseurl: baseurl})
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: js, Source: source, Baseurl: baseurl})
 				config.Lock.Unlock()
 			}
 
 			if num < config.JsSteps {
-				s.UrlQueue.Push([]string{scheme + ":" + js, strconv.Itoa(num + 1), baseurl})
+				s.AddURL([]string{js, strconv.Itoa(num), baseurl})
 			}
 		} else if strings.HasPrefix(js, "/") {
+			jss := ""
+			if cmd.B != "" {
+				jss = cmd.B + js
+			} else {
+				jss = host + js
+			}
+			jss = url_fileter(jss)
 			if cmd.G == 0 {
 				config.Lock.Lock()
-				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + js, Source: source, Baseurl: baseurl})
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: jss, Source: source, Baseurl: baseurl})
 				config.Lock.Unlock()
 			}
 			if num < config.JsSteps {
-				s.UrlQueue.Push([]string{host + js, strconv.Itoa(num + 1), baseurl})
+				s.AddURL([]string{jss, strconv.Itoa(num), baseurl})
 			}
 		} else {
+			jss := ""
+			if cmd.B != "" {
+				jss = cmd.B + cata + js
+			} else {
+				jss = host + cata + js
+			}
+			jss = url_fileter(jss)
 			if cmd.G == 0 {
 				config.Lock.Lock()
-				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: host + cata + js, Source: source, Baseurl: baseurl})
+				s.JsResult[baseurl] = append(s.JsResult[baseurl], mode.Link{Url: jss, Source: source, Baseurl: baseurl})
 				config.Lock.Unlock()
 			}
 			if num < config.JsSteps {
-				s.UrlQueue.Push([]string{host + cata + js, strconv.Itoa(num + 1), baseurl})
+				s.AddURL([]string{jss, strconv.Itoa(num), baseurl})
 			}
 		}
 	}
@@ -221,9 +248,10 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 	} else {
 		cata = catae[0]
 	}
+
 	host = scheme + "://" + host
-	for _, re := range config.UrlFind {
-		reg := regexp.MustCompile(re)
+	for _, reg := range config.UrlFindRegexps {
+
 		urls := reg.FindAllStringSubmatch(cont, -1)
 		urls = urlFilter(urls)
 		//循环提取url放到结果中
@@ -236,29 +264,32 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 			if cmd.M == 2 {
 				if strings.Contains(url[1], "https:") || strings.Contains(url[1], "http:") {
 					//host外的暂时不进行盲目请求,记录到文档中
+					u := url_fileter(url[1])
 					if cmd.G == 0 {
 						config.Lock.Lock()
-						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: url[1], Source: source, Baseurl: baseurl})
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: u, Source: source, Baseurl: baseurl})
 						config.Lock.Unlock()
 					}
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
 					if num < config.UrlSteps {
-						s.UrlQueue.Push([]string{url[1], strconv.Itoa(num + 1), baseurl})
+						s.AddURL([]string{u, strconv.Itoa(num), baseurl})
+
 					}
 
 				} else if strings.Contains(url[1], "//") {
+					u := url_fileter(scheme + ":" + url[1])
 					if cmd.G == 0 {
 						config.Lock.Lock()
-						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: scheme + ":" + url[1], Source: source, Baseurl: baseurl})
+						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: u, Source: source, Baseurl: baseurl})
 						config.Lock.Unlock()
 					}
 					if !strings.Contains(url[1], domain) {
 						continue
 					}
 					if num < config.UrlSteps {
-						s.UrlQueue.Push([]string{scheme + ":" + url[1], strconv.Itoa(num + 1), baseurl})
+						s.AddURL([]string{u, strconv.Itoa(num), baseurl})
 					}
 
 				} else if strings.HasPrefix(url[1], "/") {
@@ -269,6 +300,7 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
+					urlz = url_fileter(urlz)
 					if cmd.G == 0 {
 
 						config.Lock.Lock()
@@ -276,19 +308,17 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 						config.Lock.Unlock()
 					}
 					if num < config.UrlSteps {
-						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
+						s.AddURL([]string{urlz, strconv.Itoa(num), baseurl})
 					}
 				} else {
 					urlz := ""
 					if cmd.B != "" {
-						if strings.HasSuffix(cmd.B, "/") {
-							urlz = cmd.B + url[1]
-						} else {
-							urlz = cmd.B + "/" + url[1]
-						}
+						urlz = cmd.B + cata + url[1]
 					} else {
 						urlz = host + cata + url[1]
 					}
+					urlz = url_fileter(urlz)
+
 					if cmd.G == 0 {
 
 						config.Lock.Lock()
@@ -296,7 +326,7 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 						config.Lock.Unlock()
 					}
 					if num < config.UrlSteps {
-						s.UrlQueue.Push([]string{urlz, strconv.Itoa(num + 1), baseurl})
+						s.AddURL([]string{urlz, strconv.Itoa(num), baseurl})
 					}
 				}
 			} else {
@@ -311,6 +341,7 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 					} else {
 						urlz = host + url[1]
 					}
+					urlz = url_fileter(urlz)
 					if cmd.G == 0 {
 
 						config.Lock.Lock()
@@ -320,16 +351,12 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 				} else {
 					urlz := ""
 					if cmd.B != "" {
-						if strings.HasSuffix(cmd.B, "/") {
-							urlz = cmd.B + url[1]
-						} else {
-							urlz = cmd.B + "/" + url[1]
-						}
+						urlz = cmd.B + cata + url[1]
 					} else {
 						urlz = host + cata + url[1]
 					}
+					urlz = url_fileter(urlz)
 					if cmd.G == 0 {
-
 						config.Lock.Lock()
 						s.UrlResult[baseurl] = append(s.UrlResult[baseurl], mode.Link{Url: urlz, Source: source, Baseurl: baseurl})
 						config.Lock.Unlock()
@@ -344,12 +371,13 @@ func urlFind(s *result.Scan, cont, baseurl string, host, scheme, path, source st
 func infoFind(s *result.Scan, cont, baseurl string, source string) {
 	info := mode.Info{}
 	//手机号码
-	for i := range config.Phone {
-		phones := regexp.MustCompile(config.Phone[i]).FindAllStringSubmatch(cont, -1)
+	for _, reg := range config.InfoFindRegexps["Phone"] {
+		phones := reg.FindAllStringSubmatch(cont, -1)
 		for i := range phones {
 			info.Phone = append(info.Phone, phones[i][1])
 		}
 	}
+
 	//for i := range config.Email {
 	//	emails := regexp.MustCompile(config.Email[i]).FindAllStringSubmatch(cont, -1)
 	//	for i := range emails {
@@ -357,22 +385,22 @@ func infoFind(s *result.Scan, cont, baseurl string, source string) {
 	//	}
 	//}
 
-	for i := range config.IDcard {
-		IDcards := regexp.MustCompile(config.IDcard[i]).FindAllStringSubmatch(cont, -1)
+	for _, reg := range config.InfoFindRegexps["IDcard"] {
+		IDcards := reg.FindAllStringSubmatch(cont, -1)
 		for i := range IDcards {
 			info.IDcard = append(info.IDcard, IDcards[i][1])
 		}
 	}
 
-	for i := range config.Jwt {
-		Jwts := regexp.MustCompile(config.Jwt[i]).FindAllStringSubmatch(cont, -1)
+	for _, reg := range config.InfoFindRegexps["Jwt"] {
+		Jwts := reg.FindAllStringSubmatch(cont, -1)
 		for i := range Jwts {
 			info.JWT = append(info.JWT, Jwts[i][0])
 		}
 	}
-	for i := range config.Other {
+	for _, reg := range config.InfoFindRegexps["Other"] {
 
-		Others := regexp.MustCompile(config.Other[i]).FindAllStringSubmatch(cont, -1)
+		Others := reg.FindAllStringSubmatch(cont, -1)
 
 		for i := range Others {
 			if strings.Contains(Others[i][0], "function") {

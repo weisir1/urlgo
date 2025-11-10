@@ -6,18 +6,18 @@ import (
 	"github.com/tealeg/xlsx"
 	"github.com/weisir1/URLGo/cmd"
 	"github.com/weisir1/URLGo/mode"
-	"github.com/weisir1/URLGo/queue"
 	"github.com/weisir1/URLGo/util"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 //go:embed report.html
 var html string
-var FileCreatetime string = "202412171452"
+var fileCreatetime string = "202412171452"
 
 var (
 	//ResultsPacker mode.Link
@@ -35,18 +35,83 @@ var (
 )
 
 type Scan struct {
-	UrlQueue   *queue.Queue
-	Ch         chan []string
-	Wg         sync.WaitGroup
-	Thread     int
-	Output     string
-	Proxy      string
-	Pakeris    map[string]bool
-	Endurl     map[string][]string
-	JsResult   map[string][]mode.Link
-	UrlResult  map[string][]mode.Link
-	InfoResult map[string][]mode.Info
-	Visited    sync.Map
+	UrlQueue chan []string
+	//Ch         chan []string
+	Wg          sync.WaitGroup
+	Thread      int
+	ActiveCount int32
+	Done        chan struct{}
+	Output      string
+	Proxy       string
+	Pakeris     map[string]bool
+	Endurl      map[string][]string
+	JsResult    map[string][]mode.Link
+	UrlResult   map[string][]mode.Link
+	InfoResult  map[string][]mode.Info
+	Visited     sync.Map
+	ResultMux   sync.Mutex
+}
+
+// 新增：向队列添加URL的方法（带流控）
+func (s *Scan) AddURL(url []string) {
+	//退出优先：当两个分支都“就绪”时（比如队列有空位、同时 done 也已关闭），
+	//select 随机选一支，不保证一定优先写入队列。
+	//start := time.Now()
+	select {
+	case s.UrlQueue <- url:
+	case <-time.After(2 * time.Second):
+		log.Printf("添加URL超时: %s", url[0])
+	case <-s.Done:
+		//	select中是随机收到退出信号不在添加队列
+	}
+	//elapsed := time.Since(start).Milliseconds()
+	//fmt.Printf("添加爬取资源耗时: %d ms\n", elapsed)
+}
+
+// ✅ 安全地添加JS结果
+func (s *Scan) AddJsResult(baseurl string, link mode.Link) {
+	s.ResultMux.Lock()
+	defer s.ResultMux.Unlock()
+	s.JsResult[baseurl] = append(s.JsResult[baseurl], link)
+}
+
+// ✅ 安全地添加URL结果
+func (s *Scan) AddUrlResult(baseurl string, link mode.Link) {
+	s.ResultMux.Lock()
+	defer s.ResultMux.Unlock()
+	s.UrlResult[baseurl] = append(s.UrlResult[baseurl], link)
+}
+
+// ✅ 安全地添加Info结果
+func (s *Scan) AddInfoResult(baseurl string, info mode.Info) {
+	s.ResultMux.Lock()
+	defer s.ResultMux.Unlock()
+	s.InfoResult[baseurl] = append(s.InfoResult[baseurl], info)
+}
+
+// 新增：获取活跃任务数
+func (s *Scan) GetActiveCount() int32 {
+	return atomic.LoadInt32(&s.ActiveCount)
+}
+
+// 统计访问的URL数
+func (s *Scan) CountVisited() int {
+	count := 0
+	s.Visited.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+// 新增：通知所有协程退出
+func (s *Scan) Stop() {
+	select {
+	case <-s.Done:
+		// 已经关闭
+	default:
+		close(s.Done)
+	}
 }
 
 func Initfilecreatename() {
@@ -54,7 +119,7 @@ func Initfilecreatename() {
 	// 定义所需的时间格式
 	const layout = "200601021504"
 	// 格式化时间
-	FileCreatetime = now.Format(layout)
+	fileCreatetime = now.Format(layout)
 }
 
 func writeRow(sheet *xlsx.Sheet, rowData []string) {
@@ -64,216 +129,250 @@ func writeRow(sheet *xlsx.Sheet, rowData []string) {
 		cell.SetString(cellData)
 	}
 }
-func OutFilecXlsx(out string, s *Scan) {
 
-	var fileName string
-	//var filejwtName string
+// OutFileXlsx 导出结果到Excel文件
+func OutFilecXlsx(out string, s *Scan) error {
+	fileName := getFileName(out)
+
+	file, err := createOrOpenFile(fileName)
+	if err != nil {
+		return err
+	}
+
+	// 初始化Sheet
+	if err := initializeSheets(file); err != nil {
+		return err
+	}
+
+	// 处理每个BaseURL
+	for _, url := range Baseurl {
+		processBaseURL(file, url, s)
+	}
+
+	// 保存文件
+	if err := file.Save(fileName); err != nil {
+		return fmt.Errorf("保存文件失败: %v", err)
+	}
+
+	fmt.Println("结果已导出 --> ", fileName)
+	return nil
+}
+
+// getFileName 获取输出文件名
+func getFileName(out string) string {
+	Initfilecreatename()
 	if out != "" {
 		if strings.HasPrefix(out, ".") {
-			fileName = out
-		} else {
-			fileName = "./" + out
+			return out
 		}
-	} else {
-		fileName = "./" + FileCreatetime + "_result.xlsx"
+		return "./" + out
 	}
+	return "./" + fileCreatetime + "_result.xlsx"
+}
 
+// createOrOpenFile 创建或打开Excel文件
+func createOrOpenFile(fileName string) (*xlsx.File, error) {
 	file, err := xlsx.OpenFile(fileName)
 	if err != nil {
-		fmt.Println("File does not exist, creating a new one...")
+		log.Println("文件不存在，创建新文件...")
 		file = xlsx.NewFile()
 	}
-	urlsheet, err := file.AddSheet("url")
-	jssheet, err := file.AddSheet("js")
-	infosheet, err := file.AddSheet("info")
+	return file, nil
+}
 
+// initializeSheets 初始化Sheet的表头
+func initializeSheets(file *xlsx.File) error {
+	urlSheet, err := file.AddSheet("url")
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	jsSheet, err := file.AddSheet("js")
+	if err != nil {
+		return err
+	}
+
+	infoSheet, err := file.AddSheet("info")
+	if err != nil {
+		return err
+	}
+
+	// 写入表头
 	if cmd.S == "" {
-		writeRow(infosheet, []string{"info", "", "", "", "Source"})
-		writeRow(jssheet, []string{"jsurl", "Source"})
-		writeRow(urlsheet, []string{"url", "Source"})
-
+		writeRow(infoSheet, []string{"info", "", "", "", "Source"})
+		writeRow(jsSheet, []string{"jsurl", "Source"})
+		writeRow(urlSheet, []string{"url", "Source"})
 	} else {
-		writeRow(infosheet, []string{"info", "", "", "", "Source"})
-		writeRow(jssheet, []string{"jsurl", "Status", "Size", "Title", "Redirect", "Source"})
-		writeRow(urlsheet, []string{"url", "Status", "Size", "Title", "Redirect", "Source"})
+		writeRow(infoSheet, []string{"info", "", "", "", "Source"})
+		writeRow(jsSheet, []string{"jsurl", "Status", "Size", "Title", "Redirect", "Source"})
+		writeRow(urlSheet, []string{"url", "Status", "Size", "Title", "Redirect", "Source"})
 	}
-	if len(s.UrlResult) != 0 || len(s.JsResult) != 0 {
-		for _, url := range Baseurl {
-			urlres := s.UrlResult[url]
-			jsres := s.JsResult[url]
 
-			if urlres == nil {
-				urlres = []mode.Link{}
-			}
-			if jsres == nil {
-				jsres = []mode.Link{}
-			}
+	return nil
+}
 
-			urlres = util.RemoveDuplicatesLink(urlres) // 去重
-			jsres = util.RemoveDuplicatesLink(jsres)   // 去重
+// processBaseURL 处理单个BaseURL的所有结果
+func processBaseURL(file *xlsx.File, baseURL string, s *Scan) {
+	urlSheet, _ := file.Sheet["url"]
+	jsSheet, _ := file.Sheet["js"]
+	infoSheet, _ := file.Sheet["info"]
 
-			if cmd.S != "" {
-				urlres = util.SelectSort(urlres)
-				jsres = util.SelectSort(jsres)
-			}
-			ResultJsHost, _ := util.UrlDispose(jsres)
-			ResultUrlHost, ResultUrlOther := util.UrlDispose(urlres)
-			Domains = util.GetDomains(util.MergeArray(jsres, urlres))
-			writeRow(jssheet, []string{"", ""})
-			writeRow(jssheet, []string{"", ""})
-			writeRow(jssheet, []string{"baseurl:   " + url})
-			writeRow(jssheet, []string{strconv.Itoa(len(ResultJsHost)) + " JS to " + util.GetHost(cmd.U)})
+	// 获取结果
+	urlRes := safeGetLinks(s.UrlResult[baseURL])
+	jsRes := safeGetLinks(s.JsResult[baseURL])
+	infoRes := safeGetInfos(s.InfoResult[baseURL])
 
-			for _, j := range ResultJsHost {
-				if cmd.S != "" {
-					writeRow(jssheet, []string{j.Url, j.Status, j.Size, "", j.Redirect, j.Source})
-				} else {
-					writeRow(jssheet, []string{j.Url, j.Source})
-				}
-			}
+	// 处理URL和JS结果
+	if len(urlRes) > 0 || len(jsRes) > 0 {
+		writeURLAndJSResults(jsSheet, urlSheet, baseURL, jsRes, urlRes)
+	}
 
-			writeRow(urlsheet, []string{"", ""})
-			writeRow(urlsheet, []string{"", ""})
-			writeRow(urlsheet, []string{"baseurl:   " + url})
-			writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlHost)) + " URL to " + util.GetHost(cmd.U)})
+	// 处理Info结果
+	if len(infoRes) > 0 {
+		writeInfoResults(infoSheet, baseURL, infoRes)
+	}
+}
 
-			for _, u := range ResultUrlHost {
-				if cmd.S != "" {
-					writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
-				} else {
-					writeRow(urlsheet, []string{u.Url, u.Source})
-				}
-			}
+// writeURLAndJSResults 写入URL和JS结果
+func writeURLAndJSResults(jsSheet, urlSheet *xlsx.Sheet, baseURL string,
+	jsRes, urlRes []mode.Link) {
 
-			writeRow(urlsheet, []string{""})
-			writeRow(urlsheet, []string{""})
-			writeRow(urlsheet, []string{strconv.Itoa(len(ResultUrlOther)) + " Other URL to " + util.GetHost(cmd.U)})
+	// 去重
+	jsRes = util.RemoveDuplicatesLink(jsRes)
+	urlRes = util.RemoveDuplicatesLink(urlRes)
 
-			for _, u := range ResultUrlOther {
-				if cmd.S != "" {
-					writeRow(urlsheet, []string{u.Url, u.Status, u.Size, u.Title, u.Redirect, u.Source})
-				} else {
-					writeRow(urlsheet, []string{u.Url, u.Source})
-				}
-			}
-			//
-			writeRow(urlsheet, []string{""})
-			writeRow(urlsheet, []string{strconv.Itoa(len(Domains)) + " Domain"})
-			for _, u := range Domains {
-				writeRow(urlsheet, []string{u})
-			}
+	// 排序（如果需要）
+	if cmd.S != "" {
+		jsRes = util.SelectSort(jsRes)
+		urlRes = util.SelectSort(urlRes)
+	}
 
-			infores := s.InfoResult[url]
-			if infores == nil {
-				infores = []mode.Info{}
-			}
-			writeRow(infosheet, []string{"", ""})
-			writeRow(infosheet, []string{"", ""})
-			writeRow(infosheet, []string{"BaseUrl:     " + url})
-			writeRow(infosheet, []string{"Phone"})
-			for i := range infores {
-				for i2 := range infores[i].Phone {
-					writeRow(infosheet, []string{infores[i].Phone[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"Email"})
-			for i := range infores {
-				for i2 := range infores[i].Email {
-					writeRow(infosheet, []string{infores[i].Email[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"IDcard"})
-			for i := range infores {
-				for i2 := range infores[i].IDcard {
-					writeRow(infosheet, []string{infores[i].IDcard[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"JWT"})
-			for i := range infores {
-				for i2 := range infores[i].JWT {
-					writeRow(infosheet, []string{infores[i].JWT[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"Other"})
-			tmps := ""
-			for i := range infores {
-				for i2 := range infores[i].Other {
-					if strings.Contains(tmps, infores[i].Other[i2]) {
-						continue
-					}
-					tmps += infores[i].Other[i2]
-					writeRow(infosheet, []string{infores[i].Other[i2], "", "", "", infores[i].Source})
-				}
-			}
-			//if i > 0 && i%saveInterval == 0 {
-			//	err := file.Save(fileName)
-			//	if err != nil {
-			//		log.Fatalf("Failed to save file: %v", err)
-			//	}
-			//}
+	// 分类处理
+	jsHost, _ := util.UrlDispose(jsRes)
+	urlHost, urlOther := util.UrlDispose(urlRes)
+
+	// 更新域名列表
+	allLinks := util.MergeArray(jsRes, urlRes)
+	domains := util.GetDomains(allLinks)
+
+	// 写入JS结果
+	writeJSSection(jsSheet, baseURL, jsHost)
+
+	// 写入URL结果
+	writeURLSection(urlSheet, baseURL, urlHost, urlOther, domains)
+}
+
+// writeJSSection 写入JS部分
+func writeJSSection(sheet *xlsx.Sheet, baseURL string, jsHost []mode.Link) {
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"baseurl:", baseURL})
+	writeRow(sheet, []string{strconv.Itoa(len(jsHost)) + " JS to " + util.GetHost(cmd.U)})
+
+	for _, j := range jsHost {
+		if cmd.S != "" {
+			writeRow(sheet, []string{j.Url, j.Status, j.Size, "", j.Redirect, j.Source})
+		} else {
+			writeRow(sheet, []string{j.Url, j.Source})
 		}
-	} else if len(s.InfoResult) != 0 {
-		for _, url := range Baseurl {
-			infores := s.InfoResult[url]
-			if infores == nil {
-				infores = []mode.Info{}
-			}
-			writeRow(infosheet, []string{"", ""})
-			writeRow(infosheet, []string{"", ""})
-			writeRow(infosheet, []string{"BaseUrl:     " + url})
-			writeRow(infosheet, []string{"Phone"})
-			for i := range infores {
-				for i2 := range infores[i].Phone {
-					writeRow(infosheet, []string{infores[i].Phone[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"Email"})
-			for i := range infores {
-				for i2 := range infores[i].Email {
-					writeRow(infosheet, []string{infores[i].Email[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"IDcard"})
-			for i := range infores {
-				for i2 := range infores[i].IDcard {
-					writeRow(infosheet, []string{infores[i].IDcard[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"JWT"})
-			for i := range infores {
-				for i2 := range infores[i].JWT {
-					writeRow(infosheet, []string{infores[i].JWT[i2], "", "", "", infores[i].Source})
-				}
-			}
-			writeRow(infosheet, []string{""})
-			writeRow(infosheet, []string{"Other"})
-			tmps := ""
-			for i := range infores {
-				for i2 := range infores[i].Other {
-					if strings.Contains(tmps, infores[i].Other[i2]) {
-						continue
-					}
-					tmps += infores[i].Other[i2]
-					writeRow(infosheet, []string{infores[i].Other[i2], "", "", "", infores[i].Source})
-				}
+	}
+}
+
+// writeURLSection 写入URL部分
+func writeURLSection(sheet *xlsx.Sheet, baseURL string,
+	urlHost, urlOther []mode.Link, domains []string) {
+
+	// 写入同域URL
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"baseurl:", baseURL})
+	writeRow(sheet, []string{strconv.Itoa(len(urlHost)) + " URL to " + util.GetHost(cmd.U)})
+
+	for _, u := range urlHost {
+		writeURLRow(sheet, u)
+	}
+
+	// 写入跨域URL
+	writeRow(sheet, []string{""})
+	writeRow(sheet, []string{""})
+	writeRow(sheet, []string{strconv.Itoa(len(urlOther)) + " Other URL to " + util.GetHost(cmd.U)})
+
+	for _, u := range urlOther {
+		writeURLRow(sheet, u)
+	}
+
+	// 写入域名列表
+	writeRow(sheet, []string{""})
+	writeRow(sheet, []string{strconv.Itoa(len(domains)) + " Domain"})
+	for _, domain := range domains {
+		writeRow(sheet, []string{domain})
+	}
+}
+
+// writeURLRow 写入单个URL行
+func writeURLRow(sheet *xlsx.Sheet, link mode.Link) {
+	if cmd.S != "" {
+		writeRow(sheet, []string{link.Url, link.Status, link.Size, link.Title, link.Redirect, link.Source})
+	} else {
+		writeRow(sheet, []string{link.Url, link.Source})
+	}
+}
+
+// writeInfoResults 写入信息结果
+func writeInfoResults(sheet *xlsx.Sheet, baseURL string, infos []mode.Info) {
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"baseurl:", baseURL})
+
+	// 写入各类信息（统一处理，避免重复代码）
+	writeInfoCategory(sheet, "Phone", infos,
+		func(info mode.Info) []string { return info.Phone })
+
+	writeInfoCategory(sheet, "Email", infos,
+		func(info mode.Info) []string { return info.Email })
+
+	writeInfoCategory(sheet, "IDcard", infos,
+		func(info mode.Info) []string { return info.IDcard })
+
+	writeInfoCategory(sheet, "JWT", infos,
+		func(info mode.Info) []string { return info.JWT })
+
+	writeInfoCategory(sheet, "Other", infos,
+		func(info mode.Info) []string { return info.Other })
+}
+
+// writeInfoCategory 写入单个信息类别（核心优化：消除重复代码）
+func writeInfoCategory(sheet *xlsx.Sheet, title string, infos []mode.Info,
+	extractor func(mode.Info) []string) {
+
+	writeRow(sheet, []string{""})
+	writeRow(sheet, []string{title})
+
+	// 使用Map而不是字符串拼接去重（性能优化）
+	seen := make(map[string]bool)
+
+	for _, info := range infos {
+		for _, item := range extractor(info) {
+			if item != "" && !seen[item] {
+				seen[item] = true
+				writeRow(sheet, []string{item, "", "", "", info.Source})
 			}
 		}
 	}
+}
 
-	err = file.Save(fileName)
-	if err != nil {
-		log.Fatalf("Failed to save file: %v", err)
+// safeGetLinks 安全获取Link切片
+func safeGetLinks(links []mode.Link) []mode.Link {
+	if links == nil {
+		return []mode.Link{}
 	}
-	fmt.Println(" out to --> ", fileName)
-	return
+	return links
+}
+
+// safeGetInfos 安全获取Info切片
+func safeGetInfos(infos []mode.Info) []mode.Info {
+	if infos == nil {
+		return []mode.Info{}
+	}
+	return infos
 }

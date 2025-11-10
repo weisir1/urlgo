@@ -1,13 +1,10 @@
 package util
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"github.com/weisir1/URLGo/cmd"
 	"github.com/weisir1/URLGo/config"
 	"github.com/weisir1/URLGo/mode"
-	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -15,7 +12,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // MergeArray 合并数组
@@ -217,6 +213,9 @@ func RemoveDuplicates(elements []string) []string {
 	return result
 }
 func RemoveDuplicatesLink(assets []mode.Link) []mode.Link {
+	if len(assets) == 0 {
+		return assets
+	}
 	// 使用 map 记录已经出现过的元素
 	seen := make(map[string]bool)
 	uniqueAssets := make([]mode.Link, 0)
@@ -261,14 +260,6 @@ func RemoveRepeatElement(list []mode.Link) []mode.Link {
 	return list2
 }
 
-// 打印Fuzz进度
-func PrintFuzz() {
-	config.Mux.Lock()
-	fmt.Printf("\rFuzz %.0f%%", float64(config.Progress+1)/float64(config.FuzzNum+1)*100)
-	config.Progress++
-	config.Mux.Unlock()
-}
-
 // 处理-d
 func domainNameFilter(url string) string {
 	re := regexp.MustCompile("://([a-z0-9\\-]+\\.)*([a-z0-9\\-]+\\.[a-z0-9\\-]+)(:[0-9]+)?")
@@ -279,18 +270,6 @@ func domainNameFilter(url string) string {
 		}
 	}
 	return url
-}
-
-// 文件是否存在
-func Exists(path string) bool {
-	_, err := os.Stat(path) //os.Stat获取文件信息
-	if err != nil {
-		if os.IsExist(err) {
-			return true
-		}
-		return false
-	}
-	return true
 }
 
 // 数组去重
@@ -316,6 +295,14 @@ func GetDomains(lis []mode.Link) []string {
 		}
 	}
 	return UniqueArr(urls)
+}
+
+// 打印Fuzz进度
+func PrintFuzz() {
+	config.Mux.Lock()
+	fmt.Printf("\rFuzz %.0f%%", float64(config.Progress+1)/float64(config.FuzzNum+1)*100)
+	config.Progress++
+	config.Mux.Unlock()
 }
 
 // 提取fuzz的目录结构
@@ -451,43 +438,14 @@ func GetUserAgent() string {
 	return cmd.A
 }
 
-func GetUpdate() {
-
-	url := fmt.Sprintf("https://api.github.com/repos/pingc0y/URLFinder/releases/latest")
-	client := &http.Client{
-		Timeout: time.Second * 2,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			Proxy:           http.ProxyFromEnvironment,
-		},
-	}
-	resp, err := client.Get(url)
+// 文件是否存在
+func Exists(path string) bool {
+	_, err := os.Stat(path) //os.Stat获取文件信息
 	if err != nil {
-		cmd.XUpdate = "更新检测失败"
-		return
+		if os.IsExist(err) {
+			return true
+		}
+		return false
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		cmd.XUpdate = "更新检测失败"
-		return
-	}
-	var release struct {
-		TagName string `json:"tag_name"`
-	}
-	err = json.Unmarshal(body, &release)
-	if err != nil {
-		cmd.XUpdate = "更新检测失败"
-		return
-	}
-	if release.TagName == "" {
-		cmd.XUpdate = "更新检测失败"
-		return
-	}
-	if cmd.Update != release.TagName {
-		cmd.XUpdate = "有新版本可用: " + release.TagName
-	} else {
-		cmd.XUpdate = "已是最新版本"
-	}
-
+	return true
 }

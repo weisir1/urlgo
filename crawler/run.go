@@ -9,7 +9,6 @@ import (
 	"github.com/weisir1/URLGo/cmd"
 	"github.com/weisir1/URLGo/config"
 	"github.com/weisir1/URLGo/mode"
-	"github.com/weisir1/URLGo/queue"
 	"github.com/weisir1/URLGo/result"
 	"github.com/weisir1/URLGo/util"
 	"log"
@@ -17,8 +16,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -29,7 +31,9 @@ func load() {
 	if cmd.I {
 		config.GetConfig("config.yaml")
 	}
+	//cmd.T = 100
 	cmd.Parse()
+	config.Init(cmd.T)
 	if cmd.H {
 		flag.Usage()
 		os.Exit(0)
@@ -46,21 +50,28 @@ func load() {
 
 	cmd.U = u.String()
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			//ClientSessionCache: tls.NewLRUClientSessionCache(2048)
+		}, //缓存2048域名的握手环节
+		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   time.Second * 30,
-			KeepAlive: time.Second * 30,
+			KeepAlive: time.Second * 100,
 		}).DialContext,
-		MaxIdleConns:          cmd.T / 2,
-		MaxIdleConnsPerHost:   cmd.T + 10,
-		IdleConnTimeout:       time.Second * 90,
-		TLSHandshakeTimeout:   time.Second * 90,
-		ExpectContinueTimeout: time.Second * 10,
+		MaxIdleConns:        100, //总空闲
+		MaxIdleConnsPerHost: 10,  //单最大空闲
+		MaxConnsPerHost:     50,  //单主机最大连接数(空闲与活跃)
+
+		IdleConnTimeout: time.Second * 25,
+		//TLSHandshakeTimeout:   time.Second * 10,
+		ExpectContinueTimeout: time.Second * 1,
+		//ResponseHeaderTimeout: time.Duration(cmd.TI) * time.Second,
+		DisableCompression: false, //设置请求响应压缩
 	}
 
 	if cmd.X != "" {
-		tr.DisableKeepAlives = true
+		//tr.DisableKeepAlives = true
 		proxyUrl, parseErr := url.Parse(cmd.X)
 		if parseErr != nil {
 			fmt.Println("代理地址错误: \n" + parseErr.Error())
@@ -90,9 +101,8 @@ func load() {
 		},
 	}
 
-	result.Initfilecreatename()
-
 }
+
 func LocalFile(filename string) (urls []string) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -100,6 +110,7 @@ func LocalFile(filename string) (urls []string) {
 		color.RGBStyleFromString("237,64,35").Println("[error] the input file is wrong!!!")
 		os.Exit(1)
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -110,6 +121,7 @@ func LocalFile(filename string) (urls []string) {
 			urls = append(urls, "https://"+text)
 		}
 	}
+
 	return
 }
 func min(a, b int) int {
@@ -118,16 +130,21 @@ func min(a, b int) int {
 	}
 	return b
 }
-
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
 func Run() {
 
 	load()
+
 	if cmd.F != "" {
 		// 创建句柄
 		Initialization()
 		urls := LocalFile(cmd.F)
 		i := len(urls)
-		//s := NewScan(urls, min(i, cmd.T))
 		s := NewScan(urls, cmd.T)
 		fmt.Println("加载目标target数量: ", i)
 		//r := bufio.NewReader(fi) // 创建 Reader
@@ -140,9 +157,10 @@ func Run() {
 
 	Initialization()
 	cmd.U = util.GetProtocol(cmd.U)
-	s := NewScan([]string{cmd.U}, 1)
+	s := NewScan([]string{cmd.U}, cmd.T)
 	StartScan(s)
 	Res(s)
+
 }
 
 func Res(s *result.Scan) {
@@ -166,15 +184,27 @@ func Res(s *result.Scan) {
 }
 
 func StartScan(s *result.Scan) {
+	fmt.Printf("启动 %d 个爬虫协程，队列缓冲大小：%d\n", s.Thread, cap(s.UrlQueue))
+	// ✅ 设置信号处理（Ctrl+C）
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	// ✅ 启动信号监听协程
+	go func() {
+		<-sigChan
+		fmt.Println("\n\n 收到退出信号（Ctrl+C），正在保存结果...")
+		s.Stop() // 通知所有协程退出
+	}()
 
-	for i := 0; i <= s.Thread; i++ {
+	for i := 0; i < s.Thread; i++ {
 		s.Wg.Add(1)
-		go func() {
+		go func(id int) {
 			defer s.Wg.Done()
-			Spider(s)
-		}()
+			Spider(s, id)
+		}(i)
 	}
+	go monitorProgress(s)
 	s.Wg.Wait()
+	// ✅ 保存结果
 	fmt.Println("\nAll Target Spider Complete!!")
 	if cmd.S != "" {
 		fmt.Println("正在对目标进行状态检测")
@@ -213,13 +243,21 @@ func StartScan(s *result.Scan) {
 }
 
 func NewScan(urls []string, thread int) *result.Scan {
+	bufferSize := thread * 200 //
+	//if bufferSize > 5000 {
+	//	bufferSize = 5000 //设置上限
+	//}
+	if bufferSize < 500 {
+		bufferSize = 500 // 最小100
+	}
 	s := &result.Scan{
-		UrlQueue: queue.NewQueue(),
-		Ch:       make(chan []string, thread),
-		Wg:       sync.WaitGroup{},
-		Thread:   thread,
-		Endurl:   map[string][]string{},
-		Pakeris:  map[string]bool{},
+		UrlQueue: make(chan []string, bufferSize),
+		Done:     make(chan struct{}),
+		//Ch:       make(chan []string, thread),
+		Wg:      sync.WaitGroup{},
+		Thread:  thread,
+		Endurl:  map[string][]string{},
+		Pakeris: map[string]bool{},
 		//Output:     output,
 		Visited:    sync.Map{},
 		JsResult:   make(map[string][]mode.Link),
@@ -228,12 +266,101 @@ func NewScan(urls []string, thread int) *result.Scan {
 	}
 
 	for _, url := range urls {
-		s.UrlQueue.Push([]string{url, "0", url})
+		s.UrlQueue <- []string{url, "0", url}
 		result.Baseurl = append(result.Baseurl, url)
 	}
 	return s
 }
 
+func Spider(s *result.Scan, id int) {
+	/*	ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+
+		idleTime := time.Duration(0)
+		maxIdleTime := 5 * time.Second // 5秒内没有新任务则退出
+	*/
+	for {
+
+		select {
+		case urls := <-s.UrlQueue:
+
+			//idleTime = 0 // 重置空闲时间
+
+			// 增加活跃计数
+			atomic.AddInt32(&s.ActiveCount, 1)
+
+			//  处理URL（同步执行）
+			func() {
+				defer atomic.AddInt32(&s.ActiveCount, -1)
+				processURL(s, urls)
+			}()
+
+		/*case <-ticker.C:
+		// 定期检查是否应该退出
+		queueLen := len(s.UrlQueue)
+		active := atomic.LoadInt32(&s.ActiveCount)
+
+		if queueLen == 0 && active == 0 {
+			idleTime += 200 * time.Millisecond
+			if idleTime >= maxIdleTime {
+				// log.Printf("协程 %d: 空闲超过 %v，退出\n", id, maxIdleTime)
+				return
+			}
+		} else {
+			idleTime = 0
+		}
+		*/
+		case <-s.Done:
+			//  收到退出信号
+			a := 1
+			log.Printf("协程 %d: 收到退出信号\n", id, a)
+			return
+		}
+	}
+}
+
+// 监控进度
+func monitorProgress(s *result.Scan) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			queueLen := len(s.UrlQueue)
+			active := s.GetActiveCount()
+			visited := countVisited(&s.Visited)
+
+			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
+				queueLen, active, visited)
+			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
+				queueLen, active, visited)
+			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
+				queueLen, active, visited)
+			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
+				queueLen, active, visited)
+
+			if queueLen == 0 && active == 0 {
+				//队列为空,活跃为空 通知关闭
+				close(s.Done)
+				return
+			}
+
+		case <-s.Done:
+			return
+		}
+	}
+}
+
+// 统计访问数
+func countVisited(m *sync.Map) int {
+	count := 0
+	m.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
 func AppendEndUrl(s *result.Scan, url string, baseurl string) {
 	config.Lock.Lock()
 	defer config.Lock.Unlock()
@@ -291,3 +418,34 @@ func Initialization() {
 	result.Redirect = make(map[string]bool)
 
 }
+
+//
+//func Init() {
+//	// 初始化channel
+//
+//	// 启动写入goroutine
+//	go func() {
+//
+//		if err := createResultsDir(); err != nil {
+//			log.Printf("创建results目录失败：%v", err)
+//		}
+//		// 打开文件
+//		f, err := os.Create("tmp1.txt")
+//		if err != nil {
+//			fmt.Printf("写入临时文件错误-----------------%v", err)
+//		}
+//		defer f.Close()
+//
+//		for line := range result.WriteCh {
+//			_, err := f.WriteString(line)
+//			if err != nil {
+//				log.Println("写入文件错误：", err)
+//			}
+//		}
+//	}()
+//}
+//func createResultsDir() error {
+//	return os.MkdirAll("results", os.ModePerm)
+//}
+
+//result.WriteCh <- fmt.Sprintf("----Baseurl: %s, ----Source: %s, ----jsPath: %s\n", baseurl, source, js)

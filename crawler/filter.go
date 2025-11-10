@@ -8,6 +8,19 @@ import (
 	"strings"
 )
 
+func url_fileter(url string) string {
+	if strings.Contains(url, "/js/js/") {
+		url = strings.Replace(url, "/js/js/", "/js/", -1)
+	}
+	if strings.Contains(url, "/static/js/static/js") {
+		url = strings.Replace(url, "/static/js/static/js/", "/static/js/", -1)
+	}
+	if strings.Contains(url, "/assets/assets/") {
+		url = strings.Replace(url, "/assets/assets/", "/assets/", -1)
+	}
+	return url
+}
+
 func jsFilter(str []string) []string {
 	//对不需要的数据过滤
 	for i := range str {
@@ -49,7 +62,7 @@ func jsFilter(str []string) []string {
 
 // 过滤URL
 func urlFilter(str [][]string) [][]string {
-	Risks := []string{"remove", "delete", "insert", "update", "logout"}
+	Risks := []string{"remove", "delete", "insert", "update", "logout", "logOut"}
 	//对不需要的数据过滤
 	for i := range str {
 		if str[i][1] == "" {
