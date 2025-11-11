@@ -36,7 +36,7 @@ jobs:
         tar -czf build/urlgo-windows-amd64.tar.gz -C build urlgo-windows-amd64.exe  # 压缩 Windows 版本
 
     - name: Create Release
-      uses: actions/create-release@v1.9.0
+      uses: actions/create-release@v1
       with:
         tag_name: ${{ github.ref_name }}  # 使用 Git 提交的标签作为发布的标签（例如 'v1.0.0'）
         release_name: "Release ${{ github.ref_name }}"  # 使用标签创建友好的发布名称（例如 'Release v1.0.0'）
