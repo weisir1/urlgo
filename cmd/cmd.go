@@ -43,7 +43,7 @@ func init() {
 	flag.StringVar(&F, "f", "", "set urlFile\n批量抓取url,指定文件路径,默认url.txt")
 	//flag.StringVar(&FF, "ff", "", "set urlFile one\n与-f区别：全部抓取的数据,视为同一个url的结果来处理（只打印一份结果 | 只会输出一份结果）")
 	flag.BoolVar(&H, "h", false, "this help\n帮助信息")
-	flag.BoolVar(&I, "i", true, "set configFile\n加载yaml配置文件（不存在时,会在当前目录创建一个默认yaml配置文件）")
+	flag.BoolVar(&I, "i", true, "set configFile\n加载yaml配置文件（不存在时,会在config目录创建一个默认yaml配置文件）")
 	flag.IntVar(&M, "m", 2, "set mode\n抓取模式 \n   1 normal\n     正常请求（爬取的path路径不进行请求，速度快，搜不全） \n   2 thorough\n     全面抓取（默认,对爬取的path路径进行请求,速度较慢） \n  ")
 	flag.IntVar(&MA, "max", 99999, "set maximum\n最大抓取链接数")
 	flag.StringVar(&O, "o", ".", "set outFile\n结果导出到xlsx文件,需指定导出文件目录及xlsx后缀,否则生成到当前目录下以时间命名")

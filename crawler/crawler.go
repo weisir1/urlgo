@@ -33,10 +33,10 @@ func processURL(s *result.Scan, urls []string) {
 		return
 	}
 	u, _ := url.QueryUnescape(urls[0])
-
-	if _, loaded := s.Visited.LoadOrStore(u, true); loaded {
-		return
-	}
+	//
+	//if _, loaded := s.Visited.LoadOrStore(u, true); loaded {
+	//	return
+	//}
 
 	fmt.Printf("正在请求url: %v\n", u)
 	for _, risk := range config.Risks {
@@ -102,7 +102,7 @@ func processURL(s *result.Scan, urls []string) {
 	jsFind(s, result, base1, host, scheme, path, u, num)
 	urlFind(s, result, base1, host, scheme, path, u, num)
 	infoFind(s, result, base1, source)
-
+	fingerFind(s, result, base1, source)
 }
 
 func readResponseBody(response *http.Response) (string, error) {

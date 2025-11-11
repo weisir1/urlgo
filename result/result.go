@@ -37,35 +37,88 @@ var (
 type Scan struct {
 	UrlQueue chan []string
 	//Ch         chan []string
-	Wg          sync.WaitGroup
-	Thread      int
-	ActiveCount int32
-	Done        chan struct{}
-	Output      string
-	Proxy       string
-	Pakeris     map[string]bool
-	Endurl      map[string][]string
-	JsResult    map[string][]mode.Link
-	UrlResult   map[string][]mode.Link
-	InfoResult  map[string][]mode.Info
-	Visited     sync.Map
-	ResultMux   sync.Mutex
+	Wg           sync.WaitGroup
+	Thread       int
+	ActiveCount  int32
+	Done         chan struct{}
+	Output       string
+	Proxy        string
+	Pakeris      map[string]bool
+	Endurl       map[string][]string
+	JsResult     map[string][]mode.Link
+	UrlResult    map[string][]mode.Link
+	InfoResult   map[string][]mode.Info
+	FingerResult map[string][]mode.Link
+	Visited      sync.Map
+	ResultMux    sync.Mutex
+	PendingURLs  *sync.Map    //  sync.Map 天然安全
+	BatchSize    int          // 只读，安全
+	BatchTicker  *time.Ticker // 只在一个协程使用
 }
 
 // 新增：向队列添加URL的方法（带流控）
 func (s *Scan) AddURL(url []string) {
 	//退出优先：当两个分支都“就绪”时（比如队列有空位、同时 done 也已关闭），
+	// ✅ LoadOrStore 是原子操作（并发安全）
+	if _, loaded := s.Visited.LoadOrStore(url[0], struct{}{}); loaded {
+		return
+	}
+
+	// ✅ Store 是原子操作（并发安全）
+	//s.PendingURLs.Store(url, struct{}{})
 	//select 随机选一支，不保证一定优先写入队列。
 	//start := time.Now()
 	select {
 	case s.UrlQueue <- url:
-	case <-time.After(2 * time.Second):
-		log.Printf("添加URL超时: %s", url[0])
+	//case <-time.After(2 * time.Second):
+	//	log.Printf("添加URL超时: %s", url[0])
 	case <-s.Done:
+		return
 		//	select中是随机收到退出信号不在添加队列
 	}
 	//elapsed := time.Since(start).Milliseconds()
 	//fmt.Printf("添加爬取资源耗时: %d ms\n", elapsed)
+}
+
+// ✅ 并发安全：单个协程运行
+func (s *Scan) BatchProcessor() {
+	defer s.Wg.Done()
+
+	batch := make([]string, 0, s.BatchSize)
+
+	for {
+		select {
+		case <-s.BatchTicker.C:
+			// ✅ Range + Delete 是并发安全的
+			s.PendingURLs.Range(func(key, value interface{}) bool {
+				if len(batch) >= s.BatchSize {
+					return false
+				}
+
+				url := key.(string)
+				batch = append(batch, url)
+
+				// ✅ Delete 是原子操作
+				s.PendingURLs.Delete(url)
+				return true
+			})
+
+			// ✅ 发送到 channel（并发安全）
+			if len(batch) > 0 {
+				select {
+				case s.UrlQueue <- batch:
+				case <-time.After(1 * time.Second):
+					fmt.Printf("⚠️ 队列阻塞\n")
+				case <-s.Done:
+					return
+				}
+				batch = batch[:0]
+			}
+
+		case <-s.Done:
+			return
+		}
+	}
 }
 
 // ✅ 安全地添加JS结果
@@ -197,15 +250,21 @@ func initializeSheets(file *xlsx.File) error {
 		return err
 	}
 
+	fingerSheet, err := file.AddSheet("finger")
+	if err != nil {
+		return err
+	}
 	// 写入表头
 	if cmd.S == "" {
 		writeRow(infoSheet, []string{"info", "", "", "", "Source"})
 		writeRow(jsSheet, []string{"jsurl", "Source"})
 		writeRow(urlSheet, []string{"url", "Source"})
+		writeRow(fingerSheet, []string{"finger", "match", "Source"})
 	} else {
 		writeRow(infoSheet, []string{"info", "", "", "", "Source"})
 		writeRow(jsSheet, []string{"jsurl", "Status", "Size", "Title", "Redirect", "Source"})
 		writeRow(urlSheet, []string{"url", "Status", "Size", "Title", "Redirect", "Source"})
+		writeRow(fingerSheet, []string{"finger", "match", "Source"})
 	}
 
 	return nil
@@ -216,15 +275,17 @@ func processBaseURL(file *xlsx.File, baseURL string, s *Scan) {
 	urlSheet, _ := file.Sheet["url"]
 	jsSheet, _ := file.Sheet["js"]
 	infoSheet, _ := file.Sheet["info"]
+	fingerSheet, _ := file.Sheet["finger"]
 
 	// 获取结果
 	urlRes := safeGetLinks(s.UrlResult[baseURL])
 	jsRes := safeGetLinks(s.JsResult[baseURL])
 	infoRes := safeGetInfos(s.InfoResult[baseURL])
+	fingerRes := safeGetLinks(s.FingerResult[baseURL])
 
 	// 处理URL和JS结果
 	if len(urlRes) > 0 || len(jsRes) > 0 {
-		writeURLAndJSResults(jsSheet, urlSheet, baseURL, jsRes, urlRes)
+		writeURLAndJSResults(jsSheet, urlSheet, fingerSheet, baseURL, jsRes, urlRes, fingerRes)
 	}
 
 	// 处理Info结果
@@ -234,12 +295,13 @@ func processBaseURL(file *xlsx.File, baseURL string, s *Scan) {
 }
 
 // writeURLAndJSResults 写入URL和JS结果
-func writeURLAndJSResults(jsSheet, urlSheet *xlsx.Sheet, baseURL string,
-	jsRes, urlRes []mode.Link) {
+func writeURLAndJSResults(jsSheet, urlSheet, fingersheet *xlsx.Sheet, baseURL string,
+	jsRes, urlRes, fingerRes []mode.Link) {
 
 	// 去重
 	jsRes = util.RemoveDuplicatesLink(jsRes)
 	urlRes = util.RemoveDuplicatesLink(urlRes)
+	fingerRes = util.RemoveDuplicatesLinkFinger(fingerRes)
 
 	// 排序（如果需要）
 	if cmd.S != "" {
@@ -258,6 +320,9 @@ func writeURLAndJSResults(jsSheet, urlSheet *xlsx.Sheet, baseURL string,
 	// 写入JS结果
 	writeJSSection(jsSheet, baseURL, jsHost)
 
+	//写入finger结果
+	writeFingerSection(fingersheet, baseURL, fingerRes)
+
 	// 写入URL结果
 	writeURLSection(urlSheet, baseURL, urlHost, urlOther, domains)
 }
@@ -267,7 +332,7 @@ func writeJSSection(sheet *xlsx.Sheet, baseURL string, jsHost []mode.Link) {
 	writeRow(sheet, []string{"", ""})
 	writeRow(sheet, []string{"", ""})
 	writeRow(sheet, []string{"baseurl:", baseURL})
-	writeRow(sheet, []string{strconv.Itoa(len(jsHost)) + " JS to " + util.GetHost(cmd.U)})
+	writeRow(sheet, []string{strconv.Itoa(len(jsHost)) + " JS"})
 
 	for _, j := range jsHost {
 		if cmd.S != "" {
@@ -275,6 +340,17 @@ func writeJSSection(sheet *xlsx.Sheet, baseURL string, jsHost []mode.Link) {
 		} else {
 			writeRow(sheet, []string{j.Url, j.Source})
 		}
+	}
+}
+
+func writeFingerSection(sheet *xlsx.Sheet, baseURL string, Finger []mode.Link) {
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"", ""})
+	writeRow(sheet, []string{"baseurl:", baseURL})
+	writeRow(sheet, []string{strconv.Itoa(len(Finger)) + " finger "})
+
+	for _, j := range Finger {
+		writeRow(sheet, []string{j.Finger, j.MatchesN, j.Source})
 	}
 }
 
@@ -286,7 +362,7 @@ func writeURLSection(sheet *xlsx.Sheet, baseURL string,
 	writeRow(sheet, []string{"", ""})
 	writeRow(sheet, []string{"", ""})
 	writeRow(sheet, []string{"baseurl:", baseURL})
-	writeRow(sheet, []string{strconv.Itoa(len(urlHost)) + " URL to " + util.GetHost(cmd.U)})
+	writeRow(sheet, []string{strconv.Itoa(len(urlHost)) + " URL "})
 
 	for _, u := range urlHost {
 		writeURLRow(sheet, u)
@@ -295,7 +371,7 @@ func writeURLSection(sheet *xlsx.Sheet, baseURL string,
 	// 写入跨域URL
 	writeRow(sheet, []string{""})
 	writeRow(sheet, []string{""})
-	writeRow(sheet, []string{strconv.Itoa(len(urlOther)) + " Other URL to " + util.GetHost(cmd.U)})
+	writeRow(sheet, []string{strconv.Itoa(len(urlOther)) + " Other URL "})
 
 	for _, u := range urlOther {
 		writeURLRow(sheet, u)

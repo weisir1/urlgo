@@ -421,3 +421,14 @@ func infoFind(s *result.Scan, cont, baseurl string, source string) {
 		config.Lock.Unlock()
 	}
 }
+
+func fingerFind(s *result.Scan, cont, baseurl string, source string) {
+	for name, re := range config.FingerRegexps {
+		matches := re.FindAllString(cont, -1)
+		if len(matches) > 0 {
+			config.Lock.Lock()
+			s.FingerResult[baseurl] = append(s.FingerResult[baseurl], mode.Link{Finger: name, MatchesN: re.String(), Source: source, Baseurl: baseurl})
+			config.Lock.Unlock()
+		}
+	}
+}

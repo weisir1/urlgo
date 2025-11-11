@@ -31,6 +31,8 @@ type Link struct {
 	Title    string
 	Redirect string
 	Source   string
+	Finger   string
+	MatchesN string
 }
 
 type Info struct {

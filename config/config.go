@@ -6,6 +6,7 @@ import (
 	"github.com/weisir1/URLGo/mode"
 	"gopkg.in/yaml.v3"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -70,6 +71,7 @@ var (
 		`["']?[Aa]uthorization["']?\s*[:=]\s*['"]?\b(?:[Tt]oken\s+)?[a-zA-Z0-9\-_+/]{10,500}['"]?`,
 		//`([Bb]earer\s+[a-zA-Z0-9\-=._+/\\]{20,500})|([Bb]asic\s+[A-Za-z0-9+/]{18,}={0,2})|(eyJrIjoi[a-zA-Z0-9\-_+/]{50,100}={0,2})|(["''\[]*[Aa]uthorization["''\]]*\s*[:=]\s*[''"]?\b(?:[Tt]oken\s+)?[a-zA-Z0-9\-_+/]{20,500}[''"]?)`,
 	}
+
 	//Other  = []string{"(access.{0,1}key|access.{0,1}Key|access.{0,1}Id|access.{0,1}id|.{0,5}密码|.{0,5}账号|默认.{0,5}|加密|解密|password:.{0,10}|username:.{0,10})"}
 	//Other = []string{
 	//	`["']?(admin[_-]?email|app[_-]?id|access[_-]?key[_-]?id|account[_-]?sid|access[_-]?token|access[_-]?secret|app[_-]?key|access[_-]?key|password|username|cameraindexcode|username|pwd|user|encryptkey|bucket|app[_-]?token|app[_-]?secret|secret)["']?\s*[:=]\s*["']?([^"',\s]+|"[^"]*"|'[^']*')["']?`,
@@ -93,7 +95,12 @@ var (
 		`["'](wx[a-z0-9]{15,18})|(ww[a-z0-9]{15,18})|(gh_[a-z0-9]{11,13})["']`,
 		`(oWebControl.JS_RequestInterface)|(jsWebControl)`,
 	}
+	FingerConf = Fingerprints{
+		"Lodash": "/lodash",
+	}
 )
+
+type Fingerprints map[string]string
 
 var (
 	UrlSteps = 2
@@ -112,6 +119,7 @@ var (
 	JsFindRegexps   []*regexp.Regexp
 	UrlFindRegexps  []*regexp.Regexp
 	InfoFindRegexps map[string][]*regexp.Regexp
+	FingerRegexps   map[string]*regexp.Regexp
 )
 
 func Init(threadNum int) {
@@ -147,12 +155,24 @@ func Init(threadNum int) {
 		}
 		InfoFindRegexps[key] = regexps
 	}
-
+	FingerRegexps = make(map[string]*regexp.Regexp)
+	for name, pattern := range FingerConf {
+		FingerRegexps[name] = regexp.MustCompile(pattern)
+	}
 	fmt.Println("配置初始化完成")
 }
 
 // 读取配置文件
 func GetConfig(path string) {
+	configDir := filepath.Dir(path)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		// 如果目录不存在，则创建
+		err := os.MkdirAll(configDir, os.ModePerm)
+		if err != nil {
+			fmt.Printf("无法创建目录: %v\n", err)
+			return
+		}
+	}
 	if f, err := os.Open(path); err != nil {
 		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
 			Conf.Headers = map[string]string{"Cookie": cmd.C, "Accept": "*/*"}
@@ -175,7 +195,7 @@ func GetConfig(path string) {
 			if err2 != nil {
 				fmt.Println(err)
 			} else {
-				fmt.Println("未找到配置文件,已在当面目录下创建配置文件: config.yaml,请重新运行命令(程序运行时首先以config.yaml参数加载)")
+				fmt.Println("未找到配置文件,已在conf目录下创建配置文件: config.yaml,请重新运行命令(程序运行时首先以config.yaml参数加载)")
 			}
 		} else {
 			fmt.Println("配置文件错误,请尝试重新生成配置文件")
@@ -203,4 +223,50 @@ func GetConfig(path string) {
 		cmd.TI = Conf.Timeout
 	}
 
+}
+func GetFingerConfig() {
+	path := "conf/finger.yaml"
+
+	// 检查 config 目录是否存在
+	configDir := filepath.Dir(path)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		// 如果目录不存在，则创建
+		err := os.MkdirAll(configDir, os.ModePerm)
+		if err != nil {
+			fmt.Printf("无法创建目录: %v\n", err)
+			return
+		}
+	}
+
+	if f, err := os.Open(path); err != nil {
+		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
+
+			// 序列化为 YAML 并写入文件
+			data, err2 := yaml.Marshal(FingerConf)
+			if err2 != nil {
+				fmt.Println(err2)
+				return
+			}
+
+			err2 = os.WriteFile(path, data, 0644)
+			if err2 != nil {
+				fmt.Println(err2)
+			} else {
+				fmt.Println("未找到配置文件,已在 config 目录下创建配置文件: finger.yaml,请重新运行命令")
+
+			}
+			os.Exit(1)
+
+		}
+	} else {
+		defer f.Close()
+		// 读取配置文件内容
+		decoder := yaml.NewDecoder(f)
+		if err := decoder.Decode(&FingerConf); err != nil {
+			fmt.Printf("读取配置文件错误: %v\n", err)
+		} else {
+			fmt.Println("成功读取配置文件")
+			fmt.Println(FingerConf)
+		}
+	}
 }

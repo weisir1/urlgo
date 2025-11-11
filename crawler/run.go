@@ -29,8 +29,9 @@ var client *http.Client
 func load() {
 	//可以直接指定config.yaml,默认
 	if cmd.I {
-		config.GetConfig("config.yaml")
+		config.GetConfig("conf/config.yaml")
 	}
+	config.GetFingerConfig()
 	//cmd.T = 100
 	cmd.Parse()
 	config.Init(cmd.T)
@@ -164,7 +165,7 @@ func Run() {
 }
 
 func Res(s *result.Scan) {
-	if len(s.JsResult) == 0 && len(s.UrlResult) == 0 && len(s.InfoResult) == 0 {
+	if len(s.JsResult) == 0 && len(s.UrlResult) == 0 && len(s.InfoResult) == 0 && len(s.FingerResult) == 0 {
 		fmt.Println("未获取到数据")
 		return
 	}
@@ -243,12 +244,12 @@ func StartScan(s *result.Scan) {
 }
 
 func NewScan(urls []string, thread int) *result.Scan {
-	bufferSize := thread * 200 //
+	bufferSize := thread * 1000 //
 	//if bufferSize > 5000 {
 	//	bufferSize = 5000 //设置上限
 	//}
-	if bufferSize < 500 {
-		bufferSize = 500 // 最小100
+	if bufferSize < 3000 {
+		bufferSize = 3000 // 最小100
 	}
 	s := &result.Scan{
 		UrlQueue: make(chan []string, bufferSize),
@@ -259,16 +260,26 @@ func NewScan(urls []string, thread int) *result.Scan {
 		Endurl:  map[string][]string{},
 		Pakeris: map[string]bool{},
 		//Output:     output,
-		Visited:    sync.Map{},
-		JsResult:   make(map[string][]mode.Link),
-		UrlResult:  make(map[string][]mode.Link),
-		InfoResult: make(map[string][]mode.Info),
+		Visited:     sync.Map{},
+		PendingURLs: &sync.Map{},
+		BatchSize:   100,
+		BatchTicker: time.NewTicker(200 * time.Millisecond),
+
+		JsResult:     make(map[string][]mode.Link),
+		UrlResult:    make(map[string][]mode.Link),
+		InfoResult:   make(map[string][]mode.Info),
+		FingerResult: make(map[string][]mode.Link),
 	}
 
 	for _, url := range urls {
-		s.UrlQueue <- []string{url, "0", url}
+		s.AddURL([]string{url, "0", url})
+		//s.UrlQueue <- []string{url, "0", url}
 		result.Baseurl = append(result.Baseurl, url)
 	}
+
+	// ✅ 启动单个批量处理协程
+	//s.Wg.Add(1)
+	//go s.BatchProcessor()
 	return s
 }
 
@@ -321,7 +332,7 @@ func Spider(s *result.Scan, id int) {
 
 // 监控进度
 func monitorProgress(s *result.Scan) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -331,12 +342,6 @@ func monitorProgress(s *result.Scan) {
 			active := s.GetActiveCount()
 			visited := countVisited(&s.Visited)
 
-			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
-				queueLen, active, visited)
-			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
-				queueLen, active, visited)
-			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
-				queueLen, active, visited)
 			fmt.Printf("\r[监控] 队列: %d | 活跃: %d | 已访问: %d\n",
 				queueLen, active, visited)
 

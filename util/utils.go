@@ -228,6 +228,22 @@ func RemoveDuplicatesLink(assets []mode.Link) []mode.Link {
 	}
 	return uniqueAssets
 }
+func RemoveDuplicatesLinkFinger(assets []mode.Link) []mode.Link {
+	if len(assets) == 0 {
+		return assets
+	}
+	// 使用 map 记录已经出现过的元素
+	seen := make(map[string]bool)
+	uniqueAssets := make([]mode.Link, 0)
+
+	for _, asset := range assets {
+		if !seen[asset.Finger] {
+			seen[asset.Finger] = true
+			uniqueAssets = append(uniqueAssets, asset)
+		}
+	}
+	return uniqueAssets
+}
 
 // 去重+去除错误url
 func RemoveRepeatElement(list []mode.Link) []mode.Link {
