@@ -1,46 +1,117 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
+# GoReleaser configuration for urlgo
+# Documentation: https://goreleaser.com
+
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
     - go generate ./...
+
 builds:
-  - env:
+  - binary: urlgo
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 archives:
-  - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of uname.
+  - id: urlgo-archive
     name_template: >-
       {{ .ProjectName }}_
+      {{ .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
+    format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - config/**/*
+
 checksum:
   name_template: 'checksums.txt'
+  algorithm: sha256
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: '🚀 Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: '🐛 Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: '📝 Documentation'
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: '🔧 Other Changes'
+      order: 999
 
-# The lines beneath this are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/use them.
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: "{{ .ProjectName }}"
+  name_template: "Release {{.Version}}"
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## 🎉 urlgo {{.Version}} Released!
+    
+    ### 📦 Installation
+    
+    **Linux/macOS:**
+    ```bash
+    # Download and extract
+    tar -xzf urlgo_{{.Version}}_Linux_x86_64.tar.gz
+    chmod +x urlgo
+    sudo mv urlgo /usr/local/bin/
+    ```
+    
+    **Windows:**
+    ```powershell
+    # Extract the zip file and add to PATH
+    ```
+    
+    **Using Go:**
+    ```bash
+    go install github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/urlgo@{{.Version}}
+    ```
+  footer: |
+    ---
+    
+    **Full Changelog**: https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/urlgo/compare/{{ .PreviousTag }}...{{.Tag}}
+    
+    ## 📊 Assets
+    
+    | File | SHA256 |
+    |------|--------|
+    | checksums.txt | See file for all checksums |
+
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
-
