@@ -5,7 +5,7 @@ before:
   hooks:
     - go mod tidy
     - go generate ./...
-
+project_name: urlgo
 builds:
   - binary: urlgo
     env:
@@ -20,7 +20,11 @@ builds:
     ignore:
       - goos: windows
         goarch: arm64
-
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.BuildTime={{.Date}}
+      - -X main.Commit={{.Commit}}
 archives:
   - id: urlgo-archive
     name_template: >-
@@ -74,8 +78,8 @@ changelog:
 
 release:
   github:
-    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-    name: "{{ .ProjectName }}"
+    owner: weisir1
+    name: urlgo
   name_template: "Release {{.Version}}"
   draft: false
   prerelease: auto
