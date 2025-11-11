@@ -1,0 +1,60 @@
+name: Build and Release urlgo
+
+on:
+  push:
+    tags:
+      - 'v*'  # 只在推送标签时触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # 使用 Ubuntu 环境来执行构建任务
+
+    steps:
+    - uses: actions/checkout@v4  # 检出代码
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'  # 设置 Go 版本
+
+    - name: Clean build directory
+      run: rm -rf build/*  # 清理旧的构建文件
+
+    - name: Build for Linux
+      run: GOOS=linux GOARCH=amd64 go build -v -o build/urlgo-linux-amd64 main.go  # 构建 Linux 版本
+
+    - name: Build for macOS
+      run: GOOS=darwin GOARCH=amd64 go build -v -o build/urlgo-darwin-amd64 main.go  # 构建 macOS 版本
+
+    - name: Build for Windows
+      run: GOOS=windows GOARCH=amd64 go build -v -o build/urlgo-windows-amd64.exe main.go  # 构建 Windows 版本
+
+    - name: Archive binaries
+      run: |
+        tar -czf build/urlgo-linux-amd64.tar.gz -C build urlgo-linux-amd64  # 压缩 Linux 版本
+        tar -czf build/urlgo-darwin-amd64.tar.gz -C build urlgo-darwin-amd64  # 压缩 macOS 版本
+        tar -czf build/urlgo-windows-amd64.tar.gz -C build urlgo-windows-amd64.exe  # 压缩 Windows 版本
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}  # 使用 Git 提交的标签作为发布的标签（例如 'v1.0.0'）
+        release_name: "Release ${{ github.ref_name }}"  # 使用标签创建友好的发布名称（例如 'Release v1.0.0'）
+        draft: true  # 生成草稿版本
+        prerelease: true  # 设置为正式版本
+        token: ${{ secrets.GITHUB_TOKEN }}  # 使用自动生成的 GitHub Token 进行身份验证
+
+    - name: Upload Linux binary
+      uses: ncipollo/release-action@v1
+      with:
+        files: build/urlgo-linux-amd64.tar.gz  # 上传 Linux 构建版本
+
+    - name: Upload macOS binary
+      uses: ncipollo/release-action@v1
+      with:
+        files: build/urlgo-darwin-amd64.tar.gz  # 上传 macOS 构建版本
+
+    - name: Upload Windows binary
+      uses: ncipollo/release-action@v1
+      with:
+        files: build/urlgo-windows-amd64.tar.gz  # 上传 Windows 构建版本
